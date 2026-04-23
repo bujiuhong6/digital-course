@@ -172,7 +172,7 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 - [x] 实现 `encrypt_password` / `decrypt_password`；库中存 **base64(ciphertext+nonce)**。
 
-- [x] 教师**查看**学生密码的 **GET**（仅**带** `teacher_session`）：解密后返回，**在 OpenAPI/注释里**写明敏感性与课堂用途。
+- [x] 教师**查看**学生密码（仅**带** `teacher_session`，**再验管理员密码**；实现为 **POST** …/reveal-password，见设计 §3.4 / OpenAPI）：解密后返回，**在 OpenAPI/注释里**写明敏感性与课堂用途。
 
 - [x] 学生 **JWT**：`sub=学生 id`，`exp=15` 分钟（可按产品调整）。
 
