@@ -4,7 +4,8 @@
 
 ## 使用本仓库
 
-- **Context7 MCP**：根目录需有 **`.env`**，内含从 [Context7](https://context7.com/dashboard) 取得的 `CONTEXT7_API_KEY`。可参考 **`.env.example`** 自建 **`.env`**。配置见 **`.cursor/mcp.json`**。
+- **Context7 MCP**：根目录需有 **`.env`**，内含从 [Context7](https://context7.com/dashboard) 取得并填入的 `CONTEXT7_API_KEY=...`。复制 **`.env.example`** 为 **`.env`** 后填值。MCP 配置在 **`.cursor/mcp.json`**。  
+- **若打开 `mcp.json` 出现 ENOPRO / 未找到 `vscode-remote://backgroundcomposer+.../mcp.json` 的文件系统提供程序**：该 URI 来自**已失效的云端（Background Composer）会话**。在侧栏**从当前工作区**打开 **`.cursor/mcp.json`**，或在 **设置 → Cursor → MCP** 中编辑。编辑本地/工作区里的真实文件路径即可，Context7 与项目根 **`.env`** 中的 `CONTEXT7_API_KEY` 配套使用。
 - **Superpowers 技能正文**：`vendor/superpowers` 为子模块。若目录为空，执行 `git submodule update --init --recursive`。
 - **准备清单**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md)  
 - **设计规格**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md)  
