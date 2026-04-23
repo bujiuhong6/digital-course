@@ -36,20 +36,20 @@
 - `services/api/app/config.py`
 - `docker-compose.yml`
 
-- [ ] **步骤 1：写入 pyproject 与依赖**（见下方 `toml` 代码块；**SQLite** 用 **aiosqlite**；**Postgres** 为可选时再加 **psycopg**）
+- [x] **步骤 1：写入 pyproject 与依赖**（见下方 `toml` 代码块；**SQLite** 用 **aiosqlite**；**Postgres** 为可选时再加 **psycopg**）
 
-- [ ] **步骤 2：最小可跑的 FastAPI**（见下方 `python` 代码块）
+- [x] **步骤 2：最小可跑的 FastAPI**（见下方 `python` 代码块）
 
-- [ ] **步骤 3：从环境读配置**（`config.py` 见下方；`student_password_key` 需本地 `.env` 提供 32 字节 **base64** 密钥给 **AES-GCM**；默认 `database_url` 指向 **SQLite** 文件）
+- [x] **步骤 3：从环境读配置**（`config.py` 见下方；`student_password_key` 可本地 **`.env`** 提供 32 字节 **base64**；**缺省**有脚手架占位，**仅本机/开发**；生产必换。默认 `database_url` 指向 **SQLite** 文件 `data/teach.db`）
 
-- [ ] **步骤 4：docker-compose 挂数据卷、起 API 容器**（见下方 `yaml`；**纯 SQLite** 不强制 **db** 服务；需要 **Caddy** 时再在 compose 里加）
+- [x] **步骤 4：docker-compose 挂数据卷、起 API 容器**（见下方 `yaml`；**纯 SQLite** 不强制 **db** 服务；`services/api/Dockerfile` 供镜像构建）
 
-- [ ] **步骤 5：运行并验证**  
-  执行：`cd services/api && uv run uvicorn app.main:app --reload`  
+- [x] **步骤 5：运行并验证**  
+  执行：`cd services/api && . .venv/bin/activate && uvicorn app.main:app --reload`（或 `python -m uvicorn app.main:app --reload`）  
   再执行：`curl -s http://127.0.0.1:8000/health`  
   期望返回：`{"ok":true}`
 
-- [ ] **步骤 6：提交 Git**
+- [x] **步骤 6：提交 Git**
 
 ```toml
 [project]
