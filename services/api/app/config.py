@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     llm_api_key: str = Field(default="", description="Bearer token；章生成等。")
     chapter_gen_model: str = Field(
         default="gpt-4o-mini",
-        description="chat/completions 的 model 名。环境变量 `CHAPTER_GEN_MODEL`。",
+        description="chat/completions 的 model 名。环境变量同字段名大写。",
     )
     chapter_extension_starter_code_max_len: int = 8000
     generator_prompt_version: str = "v1"
