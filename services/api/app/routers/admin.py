@@ -12,7 +12,9 @@ from __future__ import annotations
 import csv
 import io
 import json
+import uuid
 from collections.abc import Iterator
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -28,8 +30,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, update
 
 from ..config import settings
-from ..db.models import AdminConfig, RosterEntry, Student
+from ..db.models import AdminAudit, AdminConfig, RosterEntry, Student
 from ..deps import CurrentTeacher, DBSession, require_bootstrap_token
+from ..services.crypto import decrypt_password
 from ..services.teacher_session import create_teacher_session_value
 
 try:
@@ -261,3 +264,70 @@ async def import_roster(
         await _upsert_roster_row(db, sn, fn)
         n += 1
     return {"ok": True, "imported": n}
+
+
+# --- 任务 5：教师凭 **再验管理员密码** 查看学生存储的可逆口令；写 `admin_audit`（设计 §3.4）---
+
+
+class RevealPasswordBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    admin_password: str = Field(
+        min_length=1,
+        description="当前管理员登录密码；用于防误读/越权展示。",
+        alias="adminPassword",
+    )
+
+
+@router.post(
+    "/students/{student_id}/reveal-password",
+    summary="解密并返回学生登录密码（课堂排障，高敏感）",
+)
+async def reveal_student_password(
+    _t: CurrentTeacher,
+    student_id: uuid.UUID,
+    body: RevealPasswordBody,
+    db: DBSession,
+    request: Request,
+) -> dict:
+    """
+    **高敏感**：解密 `students.password_ciphertext` 并返回明文，**仅**用于课堂内协助学生排障。
+
+    须带 `teacher_session`，且 body 中 **`adminPassword`** 与当前管理员口令一致；成功时写入审计表 `admin_audit`（`view_student_password`）。
+
+    设计 §3.4 要求再验管理员密码；本实现为 **POST** 与 OpenAPI 描述符一致（避免 GET 带 body 的互操作问题）。
+    """
+    r = await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+    admin = r.scalar_one_or_none()
+    if admin is None or _pwd is None or not _pwd.verify(body.admin_password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid admin password",
+        )
+    sr = await db.execute(select(Student).where(Student.id == student_id))
+    st = sr.scalar_one_or_none()
+    if st is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="student not found")
+    try:
+        plain = decrypt_password(st.password_ciphertext)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="decrypt failed",
+        ) from e
+    client = request.client
+    ip = client.host if client else None
+    ua = request.headers.get("user-agent")
+    db.add(
+        AdminAudit(
+            action="view_student_password",
+            target_student_id=st.id,
+            ip=ip[:64] if ip else None,
+            user_agent=ua[:512] if ua else None,
+        )
+    )
+    return {
+        "ok": True,
+        "studentId": str(st.id),
+        "studentNo": st.student_no,
+        "password": plain,
+        "auditedAt": datetime.now(timezone.utc).isoformat(),
+    }
