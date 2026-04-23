@@ -140,15 +140,15 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 新建 `routers/admin.py`、`deps.py`；`main.py` 挂载路由。
 
-- [ ] **POST `/v1/admin/bootstrap`**：Body `{"password":"..."}`；若表 `admin_config` 尚无为 **bcrypt** 存哈希并插入，否则 **403**。
+- [x] **POST `/v1/admin/bootstrap`**：Body `{"password":"..."}`；若表 `admin_config` 尚无为 **bcrypt** 存哈希并插入，否则 **403**。
 
-- [ ] **POST `/v1/admin/login`**：校验 **bcrypt**；设 **HttpOnly、签名** 的 **Cookie** `teacher_session`（若选 **纯 SPA** 用 **Bearer** 亦可，实现里**写死**一种并文档化）。
+- [x] **POST `/v1/admin/login`**：校验 **bcrypt**；设 **HttpOnly、签名** 的 **Cookie** `teacher_session`（若选 **纯 SPA** 用 **Bearer** 亦可，实现里**写死**一种并文档化）。
 
-- [ ] **GET `/v1/admin/me`**：会话有效则 **200**。
+- [x] **GET `/v1/admin/me`**：会话有效则 **200**。
 
-- [ ] **pytest**：`test_bootstrap_and_login` 用 **TestClient**。
+- [x] **pytest**：`test_bootstrap_and_login` 用 **TestClient**。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 

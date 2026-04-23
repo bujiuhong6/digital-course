@@ -13,6 +13,8 @@ class Settings(BaseSettings):
         description="32 字节随机密钥的 base64（AES-GCM 加密学生可逆密码）。",
     )
     admin_bootstrap_token: str | None = None
+    # 生产 HTTPS 下设为 true，使 `teacher_session` 带 Secure；本地 http 可 false。
+    admin_cookie_secure: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
