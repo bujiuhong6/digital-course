@@ -7,27 +7,21 @@ description: Applies the Superpowers agent methodology from obra/superpowers—b
 
 [Superpowers](https://github.com/obra/superpowers) is a composable skill library and workflow for coding agents: clarify intent before coding, capture design, plan in small verifiable steps, implement with discipline (especially TDD), debug systematically, and close branches cleanly.
 
-## Install and sources
+## Submodule and paths
 
-**This repo:** Full upstream skills live in the git submodule at **`vendor/superpowers/skills/`** (repository root: [obra/superpowers](https://github.com/obra/superpowers)). After clone, initialize submodules:
+Upstream is vendored as **`vendor/superpowers/`** (git submodule). Full skill bodies:
+
+`vendor/superpowers/skills/<skill-name>/SKILL.md`
+
+After `git clone`, run:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-**Local Cursor:** You can still install the marketplace plugin (`/add-plugin superpowers`) for IDE integration; the submodule is for **Cloud Agent and reproducible full skill text** in this project.
+**Cursor:** Read the file for the workflow you need; use **`vendor/superpowers/skills/using-superpowers/SKILL.md`** for when and how to load skills. Prefer the checked-in text over memory.
 
-## How to use skills in Cursor
-
-Upstream `using-superpowers` assumes a host-specific “Skill” tool. In Cursor, **read the matching skill file** when a workflow applies. Prefer the **current** file text over memory.
-
-**Canonical path in this workspace:**
-
-`vendor/superpowers/skills/<skill-name>/SKILL.md`
-
-Example: `vendor/superpowers/skills/test-driven-development/SKILL.md`
-
-Use the **workflow order** and **skill names** below to pick `<skill-name>`. If the submodule directory is missing, run `git submodule update --init --recursive`.
+**Desktop Cursor:** Optional marketplace plugin (`/add-plugin superpowers`) for IDE integration; the submodule supplies **full skill text** for Cloud Agent and offline clones.
 
 ## Workflow order (typical feature)
 
@@ -69,12 +63,8 @@ Follow this sequence unless the user’s instructions define a different priorit
 - **Evidence** (tests, repro, logs) before declaring success.
 - **User instructions** outrank skill defaults when they conflict.
 
-## Contributing upstream
+## Reference (in submodule)
 
-To change Superpowers itself, follow [CLAUDE.md](https://github.com/obra/superpowers/blob/main/CLAUDE.md) in that repository (PR template, one problem per PR, evaluation expectations for skill changes).
-
-## More detail
-
-- Submodule checkout: `vendor/superpowers/` (MIT — see `vendor/superpowers/LICENSE`)
-- Upstream overview: [README.md](https://github.com/obra/superpowers/blob/main/README.md)
-- Plugin manifest (paths): [.cursor-plugin/plugin.json](https://github.com/obra/superpowers/blob/main/.cursor-plugin/plugin.json)
+- `vendor/superpowers/README.md` — upstream overview  
+- `vendor/superpowers/LICENSE` — MIT  
+- `vendor/superpowers/CLAUDE.md` — contributing to **upstream** Superpowers (not this app repo)
