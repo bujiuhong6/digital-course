@@ -1,0 +1,13 @@
+# MVP：API + SQLite 数据卷；无独立 db 容器。需要 Caddy 时再加反代服务。
+services:
+  api:
+    build: ./services/api
+    volumes:
+      - teach_data:/data
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/teach.db
+    ports:
+      - "8000:8000"
+
+volumes:
+  teach_data: {}
