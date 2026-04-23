@@ -184,13 +184,13 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 新建 `services/api/app/services/chapter_json.py`（**Pydantic** 描述 `published_content`；`validate_for_publish` 可清空/拒绝过长的 `extensionCell.starterCode`）；改 `admin.py`。
 
-- [ ] 草稿建章，含 `source_material`，`ai_generated_draft` 可为空。
+- [x] 草稿建章，含 `source_material`，`ai_generated_draft` 可为空。
 
-- [ ] **POST** `/v1/admin/chapters/:id/generate`：调**任务 7** 的 `chapter_gen`；开发中可用**写死** JSON；写 `ai_generated_draft` 与 `content_status=draft`。
+- [x] **POST** `/v1/admin/chapters/:id/generate`：调**任务 7** 的 `chapter_gen`；开发中可用**写死** JSON；写 `ai_generated_draft` 与 `content_status=draft`。
 
-- [ ] **发布**：跑校验器后写入 `published_content` 与状态**已发布**。
+- [x] **发布**：跑校验器后写入 `published_content` 与状态**已发布**。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 
