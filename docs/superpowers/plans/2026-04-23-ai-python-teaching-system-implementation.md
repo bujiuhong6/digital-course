@@ -2,11 +2,11 @@
 
 > **给自动化执行者看：** 必须配合子技能：优先 `superpowers:subagent-driven-development`（推荐），或 `superpowers:executing-plans`，**按任务逐步**实现。步骤使用复选框（`- [ ]`）方便勾选跟踪。
 
-**目标：** 交付 [设计规格](../specs/2026-04-23-ai-python-teaching-system-design.md) 中描述的 **MVP**：**HTTPS** 接口，含教师管理员、名单、章的草稿/发布、**AI 生成**草稿入口；学生侧含登录、读章、**cell 执行结果上报**、**本章完成**、**聊天代理**；并搭出 **Tauri 或 Electron** 学生端壳、教师 **Web** 的脚手架。
+**目标：** 交付 [设计规格](../specs/2026-04-23-ai-python-teaching-system-design.md) 中描述的 **MVP**：**HTTPS** 接口，含教师管理员、名单、章的草稿/发布、**AI 生成**草稿入口；学生侧含登录、读章、**cell 执行结果上报**、**本章完成**、**聊天代理**；并搭出 **Tauri** 学生端壳、**HTMX** 教师 **Web** 脚手架（与设计一致）。
 
-**架构：** 单仓（monorepo）：`services/api`（**FastAPI** + **SQLAlchemy** + **Alembic**），`apps/teacher-web`（**Vite + React** 或 服务器渲染 **HTMX** —— 在**任务 1** 里选定后保持一致），`apps/student-desktop`（**Tauri** + 内嵌 **webview** 加载学生界面）；数据库用 **Docker** 里的 **PostgreSQL**；生产环境 **HTTPS** 用 **Caddy** 或 **Traefik**。
+**架构：** 单仓（monorepo）：`services/api`（**FastAPI** + **SQLAlchemy** + **Alembic** + **Jinja2** + **HTMX** 教师页，**同进程** 或 子包）；`apps/student-desktop`（**Tauri** + **WebView** 加载学生 H5/练习页）。数据库 **初期 SQLite**（WAL 单文件、挂数据卷）；需要时再在 **docker-compose** 里加**可选** **Postgres**；生产 **HTTPS** 用 **Caddy**（与设计一致）。
 
-**技术栈：** Python 3.12+、FastAPI、SQLAlchemy 2、Alembic、Pydantic v2、JWT（python-jose 或 **PyJWT**）、cryptography（学生密码用 **AES-GCM** 可逆加密）、**bcrypt**；Docker Compose；**httpx** 调外部 **LLM**（可选）。
+**技术栈：** Python 3.12+、FastAPI、SQLAlchemy 2、Alembic、Pydantic v2、**PyJWT**、cryptography（**AES-GCM**）、**bcrypt**、**aiosqlite**；Docker Compose；**httpx** 调外部 **LLM**（可选）。**可选**依赖 `psycopg[binary]` 仅在切 **PostgreSQL** 时启用。
 
 ---
 
@@ -22,8 +22,8 @@
 | `services/api/app/services/crypto.py` | 学生密码加解密 |
 | `services/api/app/services/chapter_gen.py` | 调 **LLM** 生成章草稿 **JSON**、形状校验 |
 | `services/api/tests/` | **pytest** |
-| `docker-compose.yml` | **API** + **Postgres**（可选 + **Caddy**） |
-| `apps/teacher-web/` | 教师 Web 界面 |
+| `docker-compose.yml` | **API** + **SQLite 数据卷**；**可选** `postgres` 服务；**Caddy** 反代 |
+| `services/api/app/templates/` | **Jinja2** + **HTMX** 教师端页面（**任务 10**；不设独立 `apps/teacher-web` 除非你日后拆分） |
 | `apps/student-desktop/` | **Tauri** 学生端外壳（靠后任务） |
 
 ---
@@ -36,13 +36,13 @@
 - `services/api/app/config.py`
 - `docker-compose.yml`
 
-- [ ] **步骤 1：写入 pyproject 与依赖**（见下方 `toml` 代码块）
+- [ ] **步骤 1：写入 pyproject 与依赖**（见下方 `toml` 代码块；**SQLite** 用 **aiosqlite**；**Postgres** 为可选时再加 **psycopg**）
 
 - [ ] **步骤 2：最小可跑的 FastAPI**（见下方 `python` 代码块）
 
-- [ ] **步骤 3：从环境读配置**（`config.py` 见下方；`student_password_key` 需本地 `.env` 提供 32 字节 **base64** 密钥给 **AES-GCM**）
+- [ ] **步骤 3：从环境读配置**（`config.py` 见下方；`student_password_key` 需本地 `.env` 提供 32 字节 **base64** 密钥给 **AES-GCM**；默认 `database_url` 指向 **SQLite** 文件）
 
-- [ ] **步骤 4：docker-compose 起 Postgres**（见下方 `yaml`）
+- [ ] **步骤 4：docker-compose 挂数据卷、起 API 容器**（见下方 `yaml`；**纯 SQLite** 不强制 **db** 服务；需要 **Caddy** 时再在 compose 里加）
 
 - [ ] **步骤 5：运行并验证**  
   执行：`cd services/api && uv run uvicorn app.main:app --reload`  
@@ -62,15 +62,17 @@ dependencies = [
   "sqlalchemy>=2.0",
   "alembic>=1.13",
   "pydantic-settings>=2.0",
-  "psycopg[binary]>=3.1",
+  "aiosqlite>=0.20",
   "python-multipart>=0.0.9",
   "passlib[bcrypt]>=1.7",
   "cryptography>=42.0",
   "pyjwt[crypto]>=2.8",
   "httpx>=0.27",
+  "jinja2>=3.1",
 ]
 [project.optional-dependencies]
 dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+postgres = ["psycopg[binary]>=3.1"]
 ```
 
 ```python
@@ -88,7 +90,7 @@ def health():
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://teach:teach@localhost:5432/teach"
+    database_url: str = "sqlite+aiosqlite:///./data/teach.db"
     jwt_secret: str = "change-me-in-prod"
     student_password_key: str  # 32 字节 base64，供 AES-GCM
     admin_bootstrap_token: str | None = None  # 可选，一次性
@@ -99,20 +101,23 @@ settings = Settings()
 ```
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml（MVP：API + SQLite 数据卷；无独立 db 容器）
 services:
-  db:
-    image: postgres:16-alpine
+  api:
+    build: ./services/api
+    volumes:
+      - teach_data:/data
     environment:
-      POSTGRES_USER: teach
-      POSTGRES_PASSWORD: teach
-      POSTGRES_DB: teach
-    ports: ["5432:5432"]
+      DATABASE_URL: sqlite+aiosqlite:////data/teach.db
+    ports: ["8000:8000"]
+
+volumes:
+  teach_data: {}
 ```
 
 ```bash
 git add services/api docker-compose.yml
-git commit -m "chore: scaffold FastAPI and docker-compose postgres"
+git commit -m "chore: scaffold FastAPI with SQLite volume"
 ```
 
 ---
@@ -231,9 +236,9 @@ git commit -m "chore: scaffold FastAPI and docker-compose postgres"
 
 ### 任务 10：教师 Web 最小界面（章列表、导入名单、发布）
 
-**文件：** 在 `apps/teacher-web/` 建 **Vite+React**；或在 **FastAPI** 里用 **Jinja2+HTMX**（**单人**项目后者更省事）。
+**文件（与设计一致）：** **FastAPI** 同仓内 `app/templates/` + `Jinja2` + **HTMX** 路由；**不**为教师端单独开 **Vite+React** 仓库，除非你后续要拆**可视化**章编辑器再评估。
 
-- [ ] 登录页 → 调 `POST /v1/admin/login`；若 **HTMX**，加 `app/templates/` 和若干路由；若 **SPA**，**CORS** 指到 **API 源**。
+- [ ] 登录页 → 调 `POST /v1/admin/login`；**HTMX** 局部刷新或整页**皆可**；**同域** 无需**跨源** **CORS**（学生 **Tauri** 仍用**配置**的 **API** 基址）。
 
 - [ ] 名单**导入表单**、章**编辑**（MVP 可用**大** **textarea** 直接贴 **JSON**）。
 
