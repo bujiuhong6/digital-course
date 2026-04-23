@@ -170,13 +170,13 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 新建 `services/api/app/services/crypto.py`；`student.py` 增加 `POST /v1/student/login`、`GET /v1/student/me`。
 
-- [ ] 实现 `encrypt_password` / `decrypt_password`；库中存 **base64(ciphertext+nonce)**。
+- [x] 实现 `encrypt_password` / `decrypt_password`；库中存 **base64(ciphertext+nonce)**。
 
-- [ ] 教师**查看**学生密码的 **GET**（仅**带** `teacher_session`）：解密后返回，**在 OpenAPI/注释里**写明敏感性与课堂用途。
+- [x] 教师**查看**学生密码的 **GET**（仅**带** `teacher_session`）：解密后返回，**在 OpenAPI/注释里**写明敏感性与课堂用途。
 
-- [ ] 学生 **JWT**：`sub=学生 id`，`exp=15` 分钟（可按产品调整）。
+- [x] 学生 **JWT**：`sub=学生 id`，`exp=15` 分钟（可按产品调整）。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 

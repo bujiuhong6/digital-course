@@ -1,14 +1,16 @@
 import hmac
+import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
-from .db.models import AdminConfig
+from .db.models import AdminConfig, Student
 from .db.session import get_async_session_maker
+from .services.student_jwt import decode_student_token
 from .services.teacher_session import parse_teacher_session_value
 
 
@@ -43,6 +45,38 @@ async def get_current_teacher(
 
 
 CurrentTeacher = Annotated[str, Depends(get_current_teacher)]
+
+
+async def get_current_student(
+    db: DBSession,
+    authorization: str | None = Header(default=None),
+) -> Student:
+    """学生端：`Authorization: Bearer <JWT>`（设计 §3.2）。"""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    parts = authorization.split(None, 1)
+    if len(parts) < 2:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    token = parts[1].strip()
+    try:
+        payload = decode_student_token(token)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    sub = payload.get("sub")
+    if not isinstance(sub, str):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    try:
+        sid = uuid.UUID(sub)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    r = await db.execute(select(Student).where(Student.id == sid))
+    st = r.scalar_one_or_none()
+    if st is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
+    return st
+
+
+CurrentStudent = Annotated[Student, Depends(get_current_student)]
 
 
 def require_bootstrap_token(provided: str | None) -> None:
