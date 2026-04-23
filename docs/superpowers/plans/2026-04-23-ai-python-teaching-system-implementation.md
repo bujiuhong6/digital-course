@@ -126,13 +126,13 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 新建 `services/api/app/db/base.py`、`models.py`、`session.py`；`alembic/versions/001_initial.py`（或 `alembic revision --autogenerate`）；`main.py` 里加数据库生命周期（lifespan）。
 
-- [ ] **步骤 1：按[设计规格 §3–4](../specs/2026-04-23-ai-python-teaching-system-design.md)** 定义表：`admin_config`、`students`、`roster_entries`、`chapters`、`cell_verifications`、`chapter_completions` 等字段与类型。
+- [x] **步骤 1：按[设计规格 §3–4](../specs/2026-04-23-ai-python-teaching-system-design.md)** 定义表：`admin_config`、`students`、`roster_entries`、`chapters`、`cell_verifications`、`chapter_completions` 等字段与类型。
 
-- [ ] **步骤 2：执行 `alembic init` 并 `alembic revision --autogenerate -m "initial"`，人工过一遍 diff。**
+- [x] **步骤 2：执行 `alembic init` 并 `alembic revision --autogenerate -m "initial"`，人工过一遍 diff。**
 
-- [ ] **步骤 3：执行 `alembic upgrade head`**
+- [x] **步骤 3：执行 `alembic upgrade head`**
 
-- [ ] **步骤 4：提交** `git commit -m "feat(api): add db models and initial migration"`
+- [x] **步骤 4：提交** `git commit -m "feat(api): add db models and initial migration"`
 
 ---
 

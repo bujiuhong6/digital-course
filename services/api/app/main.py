@@ -1,12 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from sqlalchemy import text
 
 from .config import settings
+from .db import dispose_engine, get_engine
+from .db import models as _db_models  # noqa: F401 — register ORM metadata
 
-app = FastAPI(title="Teaching API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    engine = get_engine()
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+    _ = settings.database_url
+    yield
+    await dispose_engine()
+
+
+app = FastAPI(title="Teaching API", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
 def health() -> dict[str, bool]:
-    # 导入即校验配置可加载；避免静默使用错误环境
-    _ = settings.database_url
     return {"ok": True}
