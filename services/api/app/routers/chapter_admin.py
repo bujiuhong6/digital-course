@@ -127,7 +127,7 @@ async def generate_chapter(
     ch = await _get_chapter_or_404(db, chapter_id)
     parsed, raw, err = await generate_chapter_draft(ch.source_material, model=None)
     ch.generator_prompt_version = settings.generator_prompt_version
-    ch.generator_model = None
+    ch.generator_model = settings.chapter_gen_model
     ch.updated_at = datetime.now(timezone.utc)
     if err is not None and parsed is None:
         ch.ai_generated_raw = raw

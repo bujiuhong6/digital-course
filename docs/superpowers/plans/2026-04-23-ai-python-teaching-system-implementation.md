@@ -198,11 +198,11 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** `services/api/app/services/chapter_gen.py`
 
-- [ ] 若环境变量 **`CHAPTER_GEN_MOCK=1`**，返回**固定**合法 **JSON** 给测试用。
+- [x] 若环境变量 **`CHAPTER_GEN_MOCK=1`**，返回**固定**合法 **JSON** 给测试用。
 
-- [ ] 否则 **`httpx` POST** 到 `LLM_BASE_URL` + `LLM_API_KEY`；把响应解析成章 **JSON**；**429** 要处理。
+- [x] 否则 **`httpx` POST** 到 `LLM_BASE_URL` + `LLM_API_KEY`；把响应解析成章 **JSON**；**429** 要处理。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 
