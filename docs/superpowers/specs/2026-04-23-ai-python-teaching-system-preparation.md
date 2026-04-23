@@ -147,7 +147,8 @@
 
 ## 续篇 6. 下一步
 
-- 写 `YYYY-MM-DD-ai-python-teaching-system-design.md` 与 **writing-plans**。
+- 设计规格：[2026-04-23-ai-python-teaching-system-design.md](2026-04-23-ai-python-teaching-system-design.md)  
+- 实现计划（`writing-plans` 约定）：[../plans/2026-04-23-ai-python-teaching-system-implementation.md](../plans/2026-04-23-ai-python-teaching-system-implementation.md)
 
 ### 决策记录
 
