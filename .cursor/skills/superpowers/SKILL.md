@@ -9,15 +9,25 @@ description: Applies the Superpowers agent methodology from obra/superpowers—b
 
 ## Install and sources
 
-**Recommended:** In Cursor Agent chat, install the plugin from the marketplace (`/add-plugin superpowers` or search “superpowers”). That loads the upstream `skills/`, `agents/`, `commands/`, and hooks from the plugin.
+**This repo:** Full upstream skills live in the git submodule at **`vendor/superpowers/skills/`** (repository root: [obra/superpowers](https://github.com/obra/superpowers)). After clone, initialize submodules:
 
-**Reference repo:** [https://github.com/obra/superpowers](https://github.com/obra/superpowers) — clone or browse for the canonical `skills/*/SKILL.md` content and updates.
+```bash
+git submodule update --init --recursive
+```
+
+**Local Cursor:** You can still install the marketplace plugin (`/add-plugin superpowers`) for IDE integration; the submodule is for **Cloud Agent and reproducible full skill text** in this project.
 
 ## How to use skills in Cursor
 
-Upstream `using-superpowers` assumes a host-specific “Skill” tool. In Cursor, **read the matching skill file** from the installed Superpowers plugin or from a local clone when a workflow applies. Prefer the **current** file text over memory.
+Upstream `using-superpowers` assumes a host-specific “Skill” tool. In Cursor, **read the matching skill file** when a workflow applies. Prefer the **current** file text over memory.
 
-If only this project skill is present, use the **workflow order** and **skill names** below to decide what to read next from the repo or plugin path.
+**Canonical path in this workspace:**
+
+`vendor/superpowers/skills/<skill-name>/SKILL.md`
+
+Example: `vendor/superpowers/skills/test-driven-development/SKILL.md`
+
+Use the **workflow order** and **skill names** below to pick `<skill-name>`. If the submodule directory is missing, run `git submodule update --init --recursive`.
 
 ## Workflow order (typical feature)
 
@@ -65,5 +75,6 @@ To change Superpowers itself, follow [CLAUDE.md](https://github.com/obra/superpo
 
 ## More detail
 
+- Submodule checkout: `vendor/superpowers/` (MIT — see `vendor/superpowers/LICENSE`)
 - Upstream overview: [README.md](https://github.com/obra/superpowers/blob/main/README.md)
 - Plugin manifest (paths): [.cursor-plugin/plugin.json](https://github.com/obra/superpowers/blob/main/.cursor-plugin/plugin.json)
