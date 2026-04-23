@@ -18,10 +18,20 @@ class Settings(BaseSettings):
     admin_cookie_secure: bool = False
     # 学生 JWT 有效期（分钟）；设计 §3.2：短效。
     student_jwt_exp_minutes: int = 15
-    # 章生成：任务 6–7；`CHAPTER_GEN_MOCK=1` 在 `chapter_gen` 内单独读取
-    chapter_gen_mock: bool = True
-    llm_base_url: str = "https://api.example.com"
-    llm_api_key: str = ""
+    # 任务 7：章 LLM。`CHAPTER_GEN_MOCK=1` 见 `chapter_gen._mock_from_env` / Settings。
+    chapter_gen_mock: bool = Field(
+        default=True,
+        description="为 False 且未设 CHAPTER_GEN_MOCK=1 时用 httpx 调 LLM。",
+    )
+    llm_base_url: str = Field(
+        default="",
+        description="OpenAI 兼容 API 基址，无尾斜杠，如 https://api.openai.com；空则真机模式不发起请求。",
+    )
+    llm_api_key: str = Field(default="", description="Bearer token；章生成等。")
+    chapter_gen_model: str = Field(
+        default="gpt-4o-mini",
+        description="chat/completions 的 model 名。环境变量 `CHAPTER_GEN_MODEL`。",
+    )
     chapter_extension_starter_code_max_len: int = 8000
     generator_prompt_version: str = "v1"
     # 发布时：扩展题 passRule 仅 `no_exception` 时是否拒绝（设计 §4.2 建议更强规则）
