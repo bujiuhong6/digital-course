@@ -156,13 +156,13 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 改 `admin.py` 增加 `POST /v1/admin/roster/import`（**CSV/JSON**）；`student.py` 增加 `POST /v1/student/register`。
 
-- [ ] **导入**：新建或更新 `roster_entries`，尚无学生时 `status=pending`。
+- [x] **导入**：新建或更新 `roster_entries`，尚无学生时 `status=pending`。
 
-- [ ] **注册**：`学号+姓名` 与名单**完全一致**则创建 `students`、加密密码（见**任务 5**），名单行改为 `bound`。
+- [x] **注册**：`学号+姓名` 与名单**完全一致**则创建 `students`、加密密码（见**任务 5**），名单行改为 `bound`。
 
-- [ ] **测试**：不匹配、成功**两条**路径。
+- [x] **测试**：不匹配、成功**两条**路径。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 
