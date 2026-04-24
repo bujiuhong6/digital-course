@@ -25,7 +25,7 @@
     <tbody>
       {% for c in chapters %}
       <tr>
-        <td>{{ c.title }}</td>
+        <td><a href="/teacher/chapters/{{ c.id }}/edit">{{ c.title }}</a></td>
         <td><code>{{ c.slug }}</code></td>
         <td>{{ c.content_status }}</td>
         <td><a href="/teacher/chapters/{{ c.id }}/edit">编辑 / 发布</a></td>
