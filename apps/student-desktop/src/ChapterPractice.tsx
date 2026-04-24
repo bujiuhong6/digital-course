@@ -85,7 +85,12 @@ type Props = {
   chapterId: string;
   title: string;
   publishedContent: unknown;
+  /** GET 章时服务端是否已有完成记录；用于再次进入时直接提示，勿再提交 */
+  initialChapterCompleted?: boolean;
 };
+
+const REPEAT_CHAPTER_SUBMIT_MSG =
+  "你已经完成了本章节练习提交，请勿重复提交。";
 
 type CellKind = "guide" | "extension";
 
@@ -283,24 +288,40 @@ function ChapterPracticeInner({
   chapterId,
   title,
   data,
+  initialChapterCompleted = false,
 }: {
   studentId: string;
   chapterId: string;
   title: string;
   data: PublishedV1;
+  initialChapterCompleted?: boolean;
 }) {
   const [codeMap, setCodeMap] = useState<Record<string, string>>({});
   const [cellState, setCellState] = useState<Record<string, CellState>>({});
   const [saveHint, setSaveHint] = useState<string | null>(null);
+  /** 本章是否已不能再次提交（服务端已有记录，或本页已成功提交过） */
+  const [chapterSubmitDone, setChapterSubmitDone] = useState(
+    initialChapterCompleted,
+  );
   /** 仅当接口 200 成功时显示（jnb-footer-msg） */
   const [completeSuccessText, setCompleteSuccessText] = useState<string | null>(
-    null,
+    () => (initialChapterCompleted ? REPEAT_CHAPTER_SUBMIT_MSG : null),
   );
   const [completeErrorText, setCompleteErrorText] = useState<string | null>(
     null,
   );
   const [completing, setCompleting] = useState(false);
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setChapterSubmitDone(!!initialChapterCompleted);
+    setCompleteErrorText(null);
+    if (initialChapterCompleted) {
+      setCompleteSuccessText(REPEAT_CHAPTER_SUBMIT_MSG);
+    } else {
+      setCompleteSuccessText(null);
+    }
+  }, [chapterId, initialChapterCompleted]);
 
   const setCode = (id: string, v: string) => {
     setCodeMap((m) => ({ ...m, [id]: v }));
@@ -512,6 +533,11 @@ function ChapterPracticeInner({
   };
 
   const onComplete = async () => {
+    if (chapterSubmitDone) {
+      setCompleteSuccessText(REPEAT_CHAPTER_SUBMIT_MSG);
+      setCompleteErrorText(null);
+      return;
+    }
     setCompleting(true);
     setSaveHint(null);
     setCompleteSuccessText(null);
@@ -521,12 +547,13 @@ function ChapterPracticeInner({
         `/v1/student/chapters/${chapterId}/complete`,
         { method: "POST" },
       );
-      if (r.alreadyCompleted !== true) {
+      setChapterSubmitDone(true);
+      if (r.alreadyCompleted === true) {
+        setCompleteSuccessText(REPEAT_CHAPTER_SUBMIT_MSG);
+      } else {
         clearChapterCodeDraft(studentId, chapterId);
+        setCompleteSuccessText("本章已标记完成");
       }
-      setCompleteSuccessText(
-        r.alreadyCompleted ? "本章此前已标记完成" : "本章已标记完成",
-      );
     } catch (e) {
       setCompleteErrorText(parseChapterCompleteError(e));
     } finally {
@@ -737,6 +764,7 @@ export function ChapterPractice({
   chapterId,
   title,
   publishedContent,
+  initialChapterCompleted = false,
 }: Props) {
   if (!isPublishedV1(publishedContent)) {
     return (
@@ -749,6 +777,7 @@ export function ChapterPractice({
       chapterId={chapterId}
       title={title}
       data={publishedContent}
+      initialChapterCompleted={initialChapterCompleted}
     />
   );
 }
