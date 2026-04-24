@@ -3,6 +3,27 @@
 from __future__ import annotations
 
 
+def test_teacher_web_form_login_sets_cookie_on_redirect_response(client) -> None:
+    """成功登录的 303 上须带上 teacher_session（见 teacher_ui 里 _set_teacher_cookie(redir)）。"""
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"password": "form-login-pw-99"},
+    )
+    r = client.post(
+        "/teacher/do-login",
+        data={"password": "form-login-pw-99"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers.get("location", "").endswith("/teacher")
+    # TestClient/httpx 把 Set-Cookie 放进 client.cookies，不一定留在 response headers
+    assert "teacher_session" in client.cookies
+    assert client.cookies.get("teacher_session", "").startswith("v1.")
+    dash = client.get("/teacher")
+    assert dash.status_code == 200
+    assert "章" in dash.text
+
+
 def test_teacher_ui_requires_session_then_works_with_cookie(client) -> None:
     c0 = client.get("/teacher", follow_redirects=False)
     assert c0.status_code in (301, 302, 303, 307, 308)
