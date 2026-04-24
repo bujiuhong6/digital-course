@@ -6,4 +6,6 @@
 
 # Local agent screenshots (not part of the repo)
 artifacts/
+.playwright-runner/node_modules/
+opt/cursor/artifacts/
 teacher-login-demo.png
