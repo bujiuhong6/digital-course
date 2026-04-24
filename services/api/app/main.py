@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from .config import settings
@@ -21,6 +23,11 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Teaching API", version="0.1.0", lifespan=lifespan)
+_static = Path(__file__).resolve().parent / "static"
+if _static.is_dir():
+    app.mount(
+        "/static", StaticFiles(directory=str(_static)), name="static"
+    )
 # 学生 Tauri 开发（Vite 1420 端口）调 API 需 CORS；生产可收窄来源
 app.add_middleware(
     CORSMiddleware,

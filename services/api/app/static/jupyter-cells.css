@@ -1,0 +1,142 @@
+/**
+ * 轻量「Notebook 式」阅读/练习区（与 design 学生端 Pyodide 一致；非 Jupyter 官方产品）。
+ * 学生端用 public/jupyter-cells.css 保持与此文件内容同步。
+ */
+.jnb-surface {
+  --jnb-prompt: #0a5;
+  --jnb-border: #d1d5db;
+  --jnb-code-bg: #fffff8;
+  --jnb-surface: #f3f4f6;
+  background: var(--jnb-surface);
+  border: 1px solid var(--jnb-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0.5rem 0 1.25rem;
+  font-size: 0.9rem;
+}
+.jnb-block-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Markdown 型：知识/扩展说明 */
+.jnb-md-cell {
+  background: #fff;
+  border: 1px solid var(--jnb-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+  margin: 0.25rem 0 0.75rem;
+}
+.jnb-md-cell p {
+  margin: 0.35rem 0;
+}
+/* 代码格：仿 In [n]: + 输入区 */
+.jnb-code-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.5rem;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+}
+.jnb-prompt {
+  flex: 0 0 auto;
+  color: var(--jnb-prompt);
+  font-weight: 600;
+  padding-top: 0.35rem;
+  user-select: none;
+  min-width: 5rem;
+  text-align: right;
+}
+.jnb-code-col {
+  flex: 1;
+  min-width: 0;
+}
+textarea.jnb-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0.45rem 0.5rem;
+  background: var(--jnb-code-bg);
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  color: #111;
+  font: inherit;
+  line-height: 1.4;
+  resize: vertical;
+}
+pre.jnb-input-ro {
+  margin: 0;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.5rem;
+  background: var(--jnb-code-bg);
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  color: #111;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+}
+.jnb-run-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.4rem 0 0.25rem 0.25rem;
+  padding-left: 5.5rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+.jnb-run-row button {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+}
+.jnb-run-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.jnb-hint {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin: 0.15rem 0 0.5rem 0.25rem;
+  padding-left: 5.5rem;
+  font-family: system-ui, sans-serif;
+}
+.jnb-ok { color: #15803d; }
+.jnb-warn { color: #b45309; }
+/* 教师深底页面上的只读区：略提亮表面 */
+.teacher-jnb .jnb-surface {
+  --jnb-border: #4b5563;
+  --jnb-code-bg: #1a1a1a;
+  --jnb-surface: #1f2937;
+}
+.teacher-jnb .jnb-md-cell {
+  background: #111827;
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+.teacher-jnb .jnb-md-cell p {
+  color: #e5e7eb;
+}
+.teacher-jnb textarea.jnb-input,
+.teacher-jnb pre.jnb-input-ro {
+  background: #0c0c0c;
+  color: #e2e8f0;
+  border-color: #4b5563;
+}
+.teacher-jnb .jnb-prompt {
+  color: #4ade80;
+}
+.teacher-jnb .jnb-hint { color: #9ca3af; }
+.teacher-jnb .jnb-ok { color: #86efac; }
+.teacher-jnb .jnb-warn { color: #fcd34d; }
