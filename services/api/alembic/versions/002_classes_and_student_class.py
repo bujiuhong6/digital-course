@@ -11,7 +11,6 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
-from sqlalchemy.dialects import sqlite
 
 revision: str = "002_class"
 down_revision: Union[str, None] = "001_initial"
