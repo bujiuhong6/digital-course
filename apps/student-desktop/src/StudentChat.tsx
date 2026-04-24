@@ -104,7 +104,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
         <div className="sd-chat-msgs" ref={listRef}>
           {messages.length === 0 && (
             <p className="sd-chat-hint">
-              可询问本题代码、报错原因或改法。当前 cell 的代码会一并发给服务器（作上下文，可能被截断）。
+              可在此向 AI 学习助手询问本题代码、运行报错与修改建议。
             </p>
           )}
           {messages.map((m, i) => (
