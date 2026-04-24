@@ -31,6 +31,7 @@
         <td class="row-actions">
           <a href="/teacher/chapters/{{ c.id }}/edit">编辑</a>
           {% if c.content_status == 'published' %}
+          <a href="/teacher/chapters/{{ c.id }}/completions" class="muted" style="margin-left:0.35rem">完成记录</a>
           <span class="muted">· 已发布</span>
           {% else %}
           <span class="muted">· 草稿</span>

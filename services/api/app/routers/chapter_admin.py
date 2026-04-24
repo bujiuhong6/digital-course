@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from ..config import settings
-from ..db.models import Chapter
+from ..db.models import Chapter, ChapterCompletion, Student
 from ..deps import CurrentTeacher, DBSession
 from ..services.chapter_gen import generate_chapter_draft
 from ..services.chapter_json import validate_for_publish
@@ -89,6 +89,37 @@ async def get_chapter(
 ) -> dict:
     ch = await _get_chapter_or_404(db, chapter_id)
     return {"ok": True, "chapter": _chapter_to_dict(ch)}
+
+
+@router.get("/{chapter_id}/completions")
+async def list_chapter_completions(
+    _t: CurrentTeacher,
+    db: DBSession,
+    chapter_id: uuid.UUID,
+) -> dict:
+    """学生端「标记本章完成」后写入 `chapter_completions`；教师可查询提交记录。"""
+    ch = await _get_chapter_or_404(db, chapter_id)
+    r = await db.execute(
+        select(ChapterCompletion, Student)
+        .join(Student, Student.id == ChapterCompletion.student_id)
+        .where(ChapterCompletion.chapter_id == chapter_id)
+        .order_by(ChapterCompletion.completed_at.desc())
+    )
+    rows = r.all()
+    return {
+        "ok": True,
+        "chapterId": str(ch.id),
+        "chapterTitle": ch.title,
+        "completions": [
+            {
+                "studentId": str(st.id),
+                "studentNo": st.student_no,
+                "fullName": st.full_name,
+                "completedAt": cc.completed_at.isoformat(),
+            }
+            for cc, st in rows
+        ],
+    }
 
 
 @router.patch("/{chapter_id}")
