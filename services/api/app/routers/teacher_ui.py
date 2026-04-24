@@ -183,6 +183,22 @@ async def ui_chapter_new(
     )
 
 
+@router.post("/chapters/{chapter_id}/delete", response_class=HTMLResponse)
+async def ui_chapter_delete(
+    db: DBSession,
+    chapter_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    ch = r.scalar_one_or_none()
+    if ch is None:
+        return HTMLResponse("章不存在", status_code=404)
+    await db.delete(ch)
+    return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+
+
 @router.get("/roster", response_class=HTMLResponse)
 async def page_roster(
     request: Request,
