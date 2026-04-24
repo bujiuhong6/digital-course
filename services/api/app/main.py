@@ -28,19 +28,28 @@ if _static.is_dir():
     app.mount(
         "/static", StaticFiles(directory=str(_static)), name="static"
     )
-# 学生 Tauri 开发（Vite 1420 端口）调 API 需 CORS；生产可收窄来源
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# 学生端（Vite/Tauri/浏览器）调 API 需 CORS。显式列常见端口，并用正则覆盖任意端口开发场景。
+_cors_params: dict = {
+    "allow_origins": [
         "http://localhost:1420",
         "http://127.0.0.1:1420",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
         "http://tauri.localhost",
+        "https://tauri.localhost",
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+# localhost / 127.0.0.1 任意端口；部分 Tauri 用 tauri.localhost
+if settings.cors_dev_localhost_regex:
+    _cors_params["allow_origin_regex"] = (
+        r"^https?://(localhost|127\.0\.0\.1|tauri\.localhost)(:\d+)?$"
+    )
+app.add_middleware(
+    CORSMiddleware,
+    **_cors_params,
 )
 app.include_router(admin.router)
 app.include_router(chapter_admin.router)

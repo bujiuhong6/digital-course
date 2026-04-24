@@ -15,6 +15,10 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 `GET /health` 应返回 `{"ok":true}`。
 
+## 学生端 CORS（Chat / `Failed to fetch`）
+
+学生桌面或 Vite  dev 可能使用 `localhost` / `127.0.0.1` 的**不同端口**（1420、5173 等）。默认开启 **`CORS_DEV_LOCALHOST_REGEX=true`**（可在 `.env` 覆盖）：对 `http(s)://localhost`、`127.0.0.1`、`tauri.localhost` **任意端口** 允许跨域。上线时可将 `CORS_DEV_LOCALHOST_REGEX=false` 并仅保留你站点域名。
+
 ## OpenAI 兼容 LLM（推荐：OpenRouter）
 
 章「从素材生成」与学生 **AI 学习助手** 均使用 `POST {base}/v1/chat/completions`，`Authorization: Bearer <API Key>`。
