@@ -92,6 +92,9 @@ type Props = {
 const REPEAT_CHAPTER_SUBMIT_MSG =
   "你已经完成了本章节练习提交，请勿重复提交。";
 
+const CHAPTER_SUBMITTED_RUN_MSG =
+  "该章节练习已经提交，请勿重复执行。";
+
 type CellKind = "guide" | "extension";
 
 /** 运行结果区：纯展示；消息栏与判分逻辑分离 */
@@ -101,7 +104,8 @@ type FeedbackKind =
   | "logic_fail"
   | "pass"
   | "network"
-  | "already_passed";
+  | "already_passed"
+  | "chapter_submitted";
 
 type CellState = {
   passed: boolean | null;
@@ -166,6 +170,9 @@ function effectiveFeedback(
   if (s.feedbackKind === "already_passed") {
     return { kind: "already_passed", showMsg: true };
   }
+  if (s.feedbackKind === "chapter_submitted") {
+    return { kind: "chapter_submitted", showMsg: true };
+  }
   if (s.feedbackKind !== "idle") {
     return { kind: s.feedbackKind, showMsg: true };
   }
@@ -203,6 +210,14 @@ function MessageBar({
       <div className="jnb-msg jnb-msg--err" role="alert">
         <div className="jnb-msg-label">系统</div>
         <div className="jnb-msg-body">{text}</div>
+      </div>
+    );
+  }
+  if (kind === "chapter_submitted") {
+    return (
+      <div className="jnb-msg jnb-msg--warn" role="status">
+        <div className="jnb-msg-label">提示</div>
+        <div className="jnb-msg-body">{CHAPTER_SUBMITTED_RUN_MSG}</div>
       </div>
     );
   }
@@ -410,6 +425,20 @@ function ChapterPracticeInner({
 
   const runAndVerify = async (kind: CellKind, cell: GuideCell | ExtensionCell) => {
     const id = cell.id;
+    if (chapterSubmitDone) {
+      setCellState((s) => ({
+        ...s,
+        [id]: {
+          passed: s[id]?.passed ?? null,
+          loading: false,
+          lastMsg: null,
+          lastRun: s[id]?.lastRun ?? null,
+          feedbackKind: "chapter_submitted",
+        },
+      }));
+      setActiveCellId(id);
+      return;
+    }
     if (cellState[id]?.passed === true) {
       setCellState((s) => ({
         ...s,
