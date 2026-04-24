@@ -12,7 +12,8 @@
 
 复制 `.env.example` 为 `.env`。
 
-- `VITE_API_BASE_URL`：已运行的教学 API 根（无尾部斜杠），同机一般为 `http://127.0.0.1:8000`。
+- **Tauri 开发**（`pnpm tauri dev`）：默认在 **Vite 开发服务里走代理**（`vite.config.ts` 中 `/v1` → `http://127.0.0.1:8000`），前端用**相对路径**调接口，与 `http://localhost:1420` 同域，避免 WebView 直接请求 `http://127.0.0.1:8000` 时出现 **Load failed / Failed to fetch**。本机需先启动 API。若你确认直连无问题，可在 `.env` 设 `VITE_DEV_API_PROXY=0` 并配置 `VITE_API_BASE_URL=http://127.0.0.1:8000`。
+- `VITE_API_BASE_URL`：打包/未走代理时使用的 API 根（无尾斜杠），同机一般为 `http://127.0.0.1:8000`。
 - `VITE_PYODIDE_INDEX_URL`（**可选**）：Pyodide `full/` 包目录的 URL，须以 `/` 结尾。默认与 `index.html` 中加载的 0.27 版本一致；**离线/内网**时可自建镜像并只改本变量与 `index.html` 中的 `pyodide.js` 地址。
 
 **任务 12**：在 WebView 中加载 **Pyodide**（`index.html` 从 CDN 引入；首次运行会拉取包体）。进入已发布章后，按 `publishedContent.version===1` 的 `blocks` 以 **Notebook 式**（`In [n]:`、灰底代码区，与 design §2/§5 一致）展示**知识/引导/扩展**；样式在 `public/jupyter-cells.css`，与 `services/api/app/static/jupyter-cells.css` **内容应保持一致**（改一处请同步复制）。「执行」运行代码并上报 `POST /v1/student/cells/verify`；全部通过后可「提交本章练习」完成本章。

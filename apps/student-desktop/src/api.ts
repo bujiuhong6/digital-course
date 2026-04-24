@@ -1,9 +1,20 @@
 /**
  * 学生 API 基址：构建时 `VITE_API_BASE_URL`（任务 11）。
- * 同机开发默认 `http://127.0.0.1:8000`；需与 FastAPI 的 CORS 允许来源一致（见 `services/api/app/main.py`）。
+ * 开发时默认走 **相对路径**（空基址），由 Vite 把 `/v1` 代理到本机 API，避免 Tauri WebView
+ * 对 `http://127.0.0.1:8000` 直接请求出现 Load failed。设 `VITE_DEV_API_PROXY=0` 可改回直连。
  */
 const raw = import.meta.env.VITE_API_BASE_URL as string | undefined;
-export const API_BASE = (raw && raw.replace(/\/$/, "")) || "http://127.0.0.1:8000";
+const devProxyOff =
+  import.meta.env.VITE_DEV_API_PROXY === "0" ||
+  import.meta.env.VITE_DEV_API_PROXY === "false";
+const viteProxyOn =
+  import.meta.env.VITE_USE_VITE_PROXY === "1" ||
+  import.meta.env.VITE_USE_VITE_PROXY === "true";
+const useViteProxy =
+  !devProxyOff && (import.meta.env.DEV || viteProxyOn);
+export const API_BASE = useViteProxy
+  ? ""
+  : (raw && raw.replace(/\/$/, "")) || "http://127.0.0.1:8000";
 
 const TOKEN_KEY = "student_access_token";
 
