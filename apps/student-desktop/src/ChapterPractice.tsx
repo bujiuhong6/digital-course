@@ -95,7 +95,8 @@ type FeedbackKind =
   | "syntax_error"
   | "logic_fail"
   | "pass"
-  | "network";
+  | "network"
+  | "already_passed";
 
 type CellState = {
   passed: boolean | null;
@@ -157,6 +158,9 @@ function effectiveFeedback(
   if (s.feedbackKind === "network") {
     return { kind: "network", showMsg: false };
   }
+  if (s.feedbackKind === "already_passed") {
+    return { kind: "already_passed", showMsg: true };
+  }
   if (s.feedbackKind !== "idle") {
     return { kind: s.feedbackKind, showMsg: true };
   }
@@ -194,6 +198,14 @@ function MessageBar({
       <div className="jnb-msg jnb-msg--err" role="alert">
         <div className="jnb-msg-label">系统</div>
         <div className="jnb-msg-body">{text}</div>
+      </div>
+    );
+  }
+  if (kind === "already_passed") {
+    return (
+      <div className="jnb-msg jnb-msg--warn" role="status">
+        <div className="jnb-msg-label">提示</div>
+        <div className="jnb-msg-body">你已经完成了该题，请勿重复提交。修改代码后可再次执行以重新验证。</div>
       </div>
     );
   }
@@ -292,6 +304,20 @@ function ChapterPracticeInner({
 
   const setCode = (id: string, v: string) => {
     setCodeMap((m) => ({ ...m, [id]: v }));
+    setCellState((s) => {
+      const cur = s[id];
+      if (!cur || cur.passed !== true) {
+        return s;
+      }
+      return {
+        ...s,
+        [id]: {
+          ...cur,
+          passed: null,
+          feedbackKind: "idle",
+        },
+      };
+    });
   };
 
   const getCode = (kind: CellKind, cell: GuideCell | ExtensionCell) => {
@@ -363,6 +389,22 @@ function ChapterPracticeInner({
 
   const runAndVerify = async (kind: CellKind, cell: GuideCell | ExtensionCell) => {
     const id = cell.id;
+    if (cellState[id]?.passed === true) {
+      setCellState((s) => ({
+        ...s,
+        [id]: {
+          passed: true,
+          loading: false,
+          lastMsg: null,
+          lastRun: s[id]?.lastRun ?? null,
+          feedbackKind: "already_passed",
+        },
+      }));
+      setCompleteSuccessText(null);
+      setCompleteErrorText(null);
+      setActiveCellId(id);
+      return;
+    }
     setCellState((s) => ({
       ...s,
       [id]: {
