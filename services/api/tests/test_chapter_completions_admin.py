@@ -53,3 +53,9 @@ def test_admin_list_chapter_completions(client, tmp_path: Path) -> None:
     assert j["completions"][0]["studentNo"] == "S9001"
     assert j["completions"][0]["fullName"] == "测试生"
     assert "completedAt" in j["completions"][0]
+
+    r_csv = client.get(f"/teacher/chapters/{cid}/completions/export")
+    assert r_csv.status_code == 200
+    assert "text/csv" in (r_csv.headers.get("content-type") or "")
+    assert "S9001" in r_csv.text
+    assert "测试生" in r_csv.text

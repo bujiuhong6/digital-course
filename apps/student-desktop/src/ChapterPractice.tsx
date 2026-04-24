@@ -18,6 +18,7 @@ type GuideCell = {
   starterCode: string;
   description: string;
   passRule: PassRule;
+  referenceAnswer?: string | null;
 };
 
 type ExtensionCell = {
@@ -25,6 +26,7 @@ type ExtensionCell = {
   promptHtml: string;
   starterCode: string | null;
   passRule: PassRule;
+  referenceAnswer?: string | null;
 };
 
 type Block = {
@@ -53,12 +55,21 @@ type Props = {
 
 type CellKind = "guide" | "extension";
 
+/** 运行结果区：纯展示；消息栏与判分逻辑分离 */
+type FeedbackKind =
+  | "idle"
+  | "syntax_error"
+  | "logic_fail"
+  | "pass"
+  | "network";
+
 type CellState = {
   passed: boolean | null;
   loading: boolean;
   lastMsg: string | null;
   /** 最近一次在浏览器内运行结果（stdout/异常） */
   lastRun: RunResult | null;
+  feedbackKind: FeedbackKind;
 };
 
 function htmlMd(html: string, key: string) {
@@ -93,14 +104,63 @@ function formatRunForDisplay(r: RunResult): string {
   return o || "（无标准输出）";
 }
 
+function runOutputIsSyntaxStyle(run: RunResult | null | undefined): boolean {
+  return Boolean(run) && !run!.runOk;
+}
+
+function MessageBar({
+  kind,
+  passedServer,
+  text,
+}: {
+  kind: FeedbackKind;
+  passedServer: boolean | null;
+  text: string | null;
+}) {
+  if (kind === "network" && text) {
+    return (
+      <div className="jnb-msg jnb-msg--err" role="alert">
+        <div className="jnb-msg-label">系统</div>
+        <div className="jnb-msg-body">{text}</div>
+      </div>
+    );
+  }
+  if (kind === "syntax_error") {
+    return (
+      <div className="jnb-msg jnb-msg--err" role="status">
+        <div className="jnb-msg-label">运行</div>
+        <div className="jnb-msg-body">代码存在错误，请按上方「运行结果」区中的 Python 提示修改后再试。</div>
+      </div>
+    );
+  }
+  if (kind === "logic_fail") {
+    return (
+      <div className="jnb-msg jnb-msg--warn" role="status">
+        <div className="jnb-msg-label">本题</div>
+        <div className="jnb-msg-body">未做对：程序能运行，但输出与题目要求不符。上方为本次运行结果；可对照下方过关说明与标准答案参考修改，再点「运行并上报」。
+        </div>
+      </div>
+    );
+  }
+  if (kind === "pass" && passedServer === true) {
+    return (
+      <div className="jnb-msg jnb-msg--ok" role="status">
+        <div className="jnb-msg-label">恭喜</div>
+        <div className="jnb-msg-body">此题已答对。上方为运行结果，系统已记录为通过。</div>
+      </div>
+    );
+  }
+  return null;
+}
+
 function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
   if (!run) {
     return null;
   }
-  const bad = !run.runOk;
+  const bad = runOutputIsSyntaxStyle(run);
   return (
     <div className="jnb-out">
-      <div className="jnb-out-label">Out：</div>
+      <div className="jnb-out-label">运行结果</div>
       <pre
         className={["jnb-out-text", bad ? "jnb-out-text--bad" : ""]
           .filter(Boolean)
@@ -200,6 +260,7 @@ function ChapterPracticeInner({
         loading: true,
         lastMsg: null,
         lastRun: null,
+        feedbackKind: "idle",
       },
     }));
     setCompleteMsg(null);
@@ -228,19 +289,25 @@ function ChapterPracticeInner({
             errorExcerpt: err,
             elapsedMs: 0,
           },
+          feedbackKind: "network",
         },
       }));
       return;
     }
+    const isSyntaxErr = !run.runOk;
     setCellState((s) => ({
       ...s,
       [id]: {
         passed: s[id]?.passed ?? null,
-        loading: true,
-        lastMsg: s[id]?.lastMsg ?? null,
+        loading: !isSyntaxErr,
+        lastMsg: null,
         lastRun: run,
+        feedbackKind: isSyntaxErr ? "syntax_error" : "idle",
       },
     }));
+    if (isSyntaxErr) {
+      return;
+    }
     try {
       const res = await apiJson<{
         ok: boolean;
@@ -258,23 +325,27 @@ function ChapterPracticeInner({
           elapsedMs: run.elapsedMs,
         }),
       });
+      const fk: FeedbackKind = res.passed ? "pass" : "logic_fail";
       setCellState((s) => ({
         ...s,
         [id]: {
           passed: res.passed,
           loading: false,
-          lastMsg: res.passed ? "本关已记录为通过" : "未通过（见过关规则或输出）",
+          lastMsg: null,
           lastRun: run,
+          feedbackKind: fk,
         },
       }));
     } catch (e) {
+      const em = e instanceof Error ? e.message : String(e);
       setCellState((s) => ({
         ...s,
         [id]: {
           passed: false,
           loading: false,
-          lastMsg: String(e),
+          lastMsg: em,
           lastRun: run,
+          feedbackKind: "network",
         },
       }));
     }
@@ -406,17 +477,19 @@ function ChapterPracticeInner({
                     ? "运行中…"
                     : "运行并上报"}
                 </button>
-                {cellState[b.guideCell.id]?.lastMsg && (
-                  <span
-                    className={
-                      cellState[b.guideCell.id]?.passed ? "jnb-ok" : "jnb-warn"
-                    }
-                  >
-                    {cellState[b.guideCell.id]?.lastMsg}
-                  </span>
-                )}
               </div>
               <RunOutputBlock run={cellState[b.guideCell.id]?.lastRun} />
+              <MessageBar
+                kind={cellState[b.guideCell.id]?.feedbackKind ?? "idle"}
+                passedServer={cellState[b.guideCell.id]?.passed ?? null}
+                text={cellState[b.guideCell.id]?.lastMsg}
+              />
+              {b.guideCell.referenceAnswer ? (
+                <div className="jnb-ref">
+                  <div className="jnb-ref-h">标准答案参考（教师设置）</div>
+                  <pre className="jnb-ref-pre">{b.guideCell.referenceAnswer}</pre>
+                </div>
+              ) : null}
 
               <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
                 扩展
@@ -469,19 +542,19 @@ function ChapterPracticeInner({
                     ? "运行中…"
                     : "运行并上报"}
                 </button>
-                {cellState[b.extensionCell.id]?.lastMsg && (
-                  <span
-                    className={
-                      cellState[b.extensionCell.id]?.passed
-                        ? "jnb-ok"
-                        : "jnb-warn"
-                    }
-                  >
-                    {cellState[b.extensionCell.id]?.lastMsg}
-                  </span>
-                )}
               </div>
               <RunOutputBlock run={cellState[b.extensionCell.id]?.lastRun} />
+              <MessageBar
+                kind={cellState[b.extensionCell.id]?.feedbackKind ?? "idle"}
+                passedServer={cellState[b.extensionCell.id]?.passed ?? null}
+                text={cellState[b.extensionCell.id]?.lastMsg}
+              />
+              {b.extensionCell.referenceAnswer ? (
+                <div className="jnb-ref">
+                  <div className="jnb-ref-h">标准答案参考（教师设置）</div>
+                  <pre className="jnb-ref-pre">{b.extensionCell.referenceAnswer}</pre>
+                </div>
+              ) : null}
             </section>
           );
         })}

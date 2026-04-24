@@ -289,6 +289,69 @@ pre.jnb-input-ro {
   color: #7f1d1d;
 }
 
+/* 判题消息栏 */
+.jnb-msg {
+  margin: 0.5rem 0 0.5rem 4.7rem;
+  padding: 0.55rem 0.7rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  border: 1px solid var(--jnb-border);
+  font-family: system-ui, sans-serif;
+}
+.jnb-msg-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+}
+.jnb-msg-body {
+  color: #1e293b;
+}
+.jnb-msg--ok {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+.jnb-msg--ok .jnb-msg-label { color: #047857; }
+.jnb-msg--warn {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #78350f;
+}
+.jnb-msg--warn .jnb-msg-label { color: #b45309; }
+.jnb-msg--err {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}
+.jnb-msg--err .jnb-msg-label { color: #b91c1c; }
+
+/* 标准答案参考（教师发布） */
+.jnb-ref {
+  margin: 0.65rem 0 0.4rem 4.2rem;
+  padding: 0.5rem 0.65rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+}
+.jnb-ref-h {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #166534;
+  margin-bottom: 0.35rem;
+}
+.jnb-ref-pre {
+  margin: 0;
+  font: 0.8rem/1.45 ui-monospace, Menlo, Consolas, monospace;
+  color: #14532d;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow: auto;
+}
+
 /* 过关规则（与提示区分：左侧强调条） */
 .jnb-pass {
   margin: 0.45rem 0 0.5rem;

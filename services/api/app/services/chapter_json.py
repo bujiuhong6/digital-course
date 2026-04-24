@@ -57,6 +57,12 @@ class GuideCell(BaseModel):
     starter_code: str = Field(min_length=1, alias="starterCode")
     description: str = Field(min_length=1, max_length=16_000)
     pass_rule: PassRule = Field(alias="passRule")
+    reference_answer: str | None = Field(
+        default=None,
+        max_length=32_000,
+        alias="referenceAnswer",
+        description="教师可填标准答案/参考代码（发布给学生端作提示，不参与服务端判分）",
+    )
 
 
 class ExtensionCell(BaseModel):
@@ -68,6 +74,12 @@ class ExtensionCell(BaseModel):
         default=None, max_length=1_000_000, alias="starterCode"
     )
     pass_rule: PassRule = Field(alias="passRule")
+    reference_answer: str | None = Field(
+        default=None,
+        max_length=32_000,
+        alias="referenceAnswer",
+        description="教师可填标准答案/参考代码（发布给学生端作提示，不参与服务端判分）",
+    )
 
 
 class ContentBlock(BaseModel):

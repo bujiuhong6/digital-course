@@ -106,6 +106,12 @@
         <span class="jnb-prompt">In [{{ iGuide }}]:</span>
         <div class="jnb-code-col"><pre class="jnb-input-ro">{{ g.get('starterCode', '') }}</pre></div>
       </div>
+      {% if g.get('referenceAnswer') %}
+      <div class="jnb-ref" style="margin-left:0.25rem">
+        <div class="jnb-ref-h">标准答案（发布给学生）</div>
+        <pre class="jnb-ref-pre">{{ g.get('referenceAnswer', '') }}</pre>
+      </div>
+      {% endif %}
       {% set gpr = g.get('passRule') or {} %}
       <p class="jnb-pass">过关：模式 <code>{{ gpr.get('mode', '') }}</code>
         {% if gpr.get('expectedSubstring') %}，stdout 须含 <code>{{ gpr.get('expectedSubstring') }}</code>{% endif %}
@@ -123,6 +129,12 @@
         <span class="jnb-prompt">In [{{ iExt }}]:</span>
         <div class="jnb-code-col">{% if ex.get('starterCode') %}<pre class="jnb-input-ro">{{ ex.get('starterCode') }}</pre>{% else %}<p class="jnb-cell-desc" style="padding-left:0">（无起始代码，由学生自写）</p>{% endif %}</div>
       </div>
+      {% if ex.get('referenceAnswer') %}
+      <div class="jnb-ref" style="margin-left:0.25rem">
+        <div class="jnb-ref-h">标准答案（发布给学生）</div>
+        <pre class="jnb-ref-pre">{{ ex.get('referenceAnswer', '') }}</pre>
+      </div>
+      {% endif %}
       {% set epr = ex.get('passRule') or {} %}
       <p class="jnb-pass">过关：模式 <code>{{ epr.get('mode', '') }}</code>
         {% if epr.get('expectedSubstring') %}，stdout 须含 <code>{{ epr.get('expectedSubstring') }}</code>{% endif %}

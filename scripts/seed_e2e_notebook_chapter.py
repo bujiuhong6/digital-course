@@ -60,6 +60,7 @@ def published_content() -> dict:
                     "id": "c-guide-e2e",
                     "starterCode": 'print("改这里，先故意写错再改对")',
                     "description": "引导：stdout 须包含子串 ok",
+                    "referenceAnswer": 'print("ok")',
                     "passRule": {
                         "mode": "stdout_contains",
                         "expectedSubstring": "ok",
@@ -69,6 +70,7 @@ def published_content() -> dict:
                     "id": "c-ext-e2e",
                     "promptHtml": "<p>扩展：打印一行含 Hello 的问候。</p>",
                     "starterCode": 'print("先写错再改")',
+                    "referenceAnswer": 'print("Hello!")',
                     "passRule": {
                         "mode": "stdout_contains",
                         "expectedSubstring": "Hello",

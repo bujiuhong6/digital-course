@@ -4,12 +4,15 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from fastapi import APIRouter, Cookie, File, Form, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, update
 
@@ -231,7 +234,53 @@ async def page_chapter_completions(
     return templates.TemplateResponse(
         request,
         "teacher/chapter_completions.html",
-        {"ch": ch, "completions": completions},
+        {
+            "ch": ch,
+            "completions": completions,
+            "submit_count": len(completions),
+        },
+    )
+
+
+@router.get("/chapters/{chapter_id}/completions/export")
+async def export_chapter_completions_csv(
+    db: DBSession,
+    chapter_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """导出本章「标记完成」学生学号、姓名（CSV，UTF-8 BOM 便于 Excel）。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    ch = r.scalar_one_or_none()
+    if ch is None:
+        return HTMLResponse("章不存在", status_code=404)
+    r2 = await db.execute(
+        select(ChapterCompletion, Student)
+        .join(Student, Student.id == ChapterCompletion.student_id)
+        .where(ChapterCompletion.chapter_id == chapter_id)
+        .order_by(Student.student_no)
+    )
+    rows = r2.all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["studentNo", "fullName", "completedAtUtc"])
+    for cc, st in rows:
+        w.writerow(
+            [
+                st.student_no,
+                st.full_name,
+                cc.completed_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+        )
+    body = "\ufeff" + buf.getvalue()
+    safe = quote(ch.slug[:40] or "chapter", safe="")
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="completions-{safe}.csv"',
+        },
     )
 
 
