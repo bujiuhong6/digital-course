@@ -26,7 +26,7 @@ from ..config import (
     normalize_openai_compat_base_url,
     settings,
 )
-from ..db.models import Chapter
+from ..db.models import Chapter, Student
 from ..deps import CurrentStudent, DBSession
 from ..services.chat_limiter import check_and_record_request
 
@@ -67,7 +67,10 @@ def _build_user_prompt(
     # 轻量题面：只取已发布 `publishedContent` 的短摘要式字符串（不整章外泄过长 HTML）
     ctx_tail = ""
     if ch is not None:
-        raw = json.dumps(ch, ensure_ascii=False)
+        try:
+            raw = json.dumps(ch, default=str, ensure_ascii=False)
+        except (TypeError, ValueError) as e:
+            raw = f'{{"error":"chapter_context_not_json_serializable","detail":"{e!s}"}}'
         ctx_tail = _truncate(raw, min(cap, cap // 2))
     cpart = (code or "").strip()
     cpart = _truncate(cpart, min(cap, cap // 2)) if cpart else ""
@@ -80,12 +83,11 @@ def _build_user_prompt(
     )
 
 
-@router.post("/chat")
-async def student_chat(
-    me: CurrentStudent,
+async def _student_chat_impl(
+    me: Student,
     payload: ChatBody,
     db: DBSession,
-):
+) -> JSONResponse | StreamingResponse | dict:
     r = await db.execute(
         select(Chapter).where(Chapter.id == payload.chapter_id, Chapter.content_status == "published")
     )
@@ -203,6 +205,23 @@ async def student_chat(
         "message": text,
         "at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.post("/chat")
+async def student_chat(
+    me: CurrentStudent,
+    payload: ChatBody,
+    db: DBSession,
+):
+    try:
+        return await _student_chat_impl(me, payload, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"chat_unhandled: {type(e).__name__}: {e!s}"[:2000],
+        ) from e
 
 
 async def _stream_chat(
