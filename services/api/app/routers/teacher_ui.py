@@ -237,6 +237,10 @@ async def ui_roster_import(
     )
 
 
+def _wants_htmx(request: Request) -> bool:
+    return (request.headers.get("hx-request") or "").lower() == "true"
+
+
 @router.get("/chapters/{chapter_id}/edit", response_class=HTMLResponse)
 async def page_chapter_edit(
     request: Request,
@@ -255,12 +259,29 @@ async def page_chapter_edit(
         if ch.ai_generated_draft is not None
         else json.dumps(sample_published_v1(), ensure_ascii=False, indent=2)
     )
+    qp = request.query_params
+    ui_flash: str | None = None
+    ui_flash_level: str | None = None
+    if qp.get("saved") == "1":
+        ui_flash, ui_flash_level = "草稿已保存。", "ok"
+    elif qp.get("draft_error") == "1":
+        ui_flash, ui_flash_level = "草稿未保存：JSON 格式无法解析。请检查大括号/引号后重试。", "error"
+    elif qp.get("gen_ok") == "1":
+        ui_flash, ui_flash_level = "已生成草稿。请检查并发布。", "ok"
+    elif qp.get("gen_err") == "1":
+        ui_flash, ui_flash_level = "生成未成功。请检查素材与 LLM 配置。", "error"
+    elif qp.get("pub_ok") == "1":
+        ui_flash, ui_flash_level = "已发布。", "ok"
+    elif qp.get("pub_err") == "1":
+        ui_flash, ui_flash_level = "发布未成功。请检查草稿或「发布」校验信息。", "error"
     return templates.TemplateResponse(
         request,
         "teacher/chapter_edit.html",
         {
             "ch": ch,
             "draft_json": draft_json,
+            "ui_flash": ui_flash,
+            "ui_flash_level": ui_flash_level,
         },
     )
 
@@ -279,27 +300,43 @@ async def ui_save_draft(
     ch = r.scalar_one_or_none()
     if ch is None:
         return HTMLResponse("章不存在", status_code=404)
+    htmx = _wants_htmx(request)
     try:
         parsed = json.loads(draft)
     except json.JSONDecodeError as e:
-        return templates.TemplateResponse(
-            request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": f"JSON 错误: {e!s}"},
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {"level": "error", "message": f"JSON 错误: {e!s}"},
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?draft_error=1",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     if not isinstance(parsed, (dict, list)):
-        return templates.TemplateResponse(
-            request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": "草稿须为 JSON 对象或数组。"},
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {"level": "error", "message": "草稿须为 JSON 对象或数组。"},
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?draft_error=1",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     ch.ai_generated_draft = parsed
     ch.content_status = "draft"
     ch.updated_at = datetime.now(timezone.utc)
-    return templates.TemplateResponse(
-        request,
-        "teacher/partials/flash.html",
-        {"level": "ok", "message": "草稿已保存。"},
+    if htmx:
+        return templates.TemplateResponse(
+            request,
+            "teacher/partials/flash.html",
+            {"level": "ok", "message": "草稿已保存。"},
+        )
+    return RedirectResponse(
+        url=f"/teacher/chapters/{chapter_id}/edit?saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -316,6 +353,7 @@ async def ui_generate(
     ch = r.scalar_one_or_none()
     if ch is None:
         return HTMLResponse("章不存在", status_code=404)
+    htmx = _wants_htmx(request)
     parsed, raw, err = await generate_chapter_draft(ch.source_material, model=None)
     ch.generator_prompt_version = settings.generator_prompt_version
     ch.generator_model = settings.chapter_gen_model
@@ -324,25 +362,40 @@ async def ui_generate(
         ch.ai_generated_raw = raw
         ch.ai_generated_draft = None
         ch.content_status = "draft_invalid"
-        return templates.TemplateResponse(
-            request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": err or "生成失败"},
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {"level": "error", "message": err or "生成失败"},
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?gen_err=1",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     if parsed is not None:
         ch.ai_generated_draft = parsed
         ch.ai_generated_raw = raw
         ch.content_status = "draft"
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {"level": "ok", "message": "已生成草稿。请检查并发布。"},
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?gen_ok=1",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    ch.content_status = "draft_invalid"
+    if htmx:
         return templates.TemplateResponse(
             request,
             "teacher/partials/flash.html",
-            {"level": "ok", "message": "已生成草稿。请检查并发布。"},
+            {"level": "error", "message": err or "unknown"},
         )
-    ch.content_status = "draft_invalid"
-    return templates.TemplateResponse(
-        request,
-        "teacher/partials/flash.html",
-        {"level": "error", "message": err or "unknown"},
+    return RedirectResponse(
+        url=f"/teacher/chapters/{chapter_id}/edit?gen_err=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
@@ -359,32 +412,48 @@ async def ui_publish(
     ch = r.scalar_one_or_none()
     if ch is None:
         return HTMLResponse("章不存在", status_code=404)
+    htmx = _wants_htmx(request)
     d = ch.ai_generated_draft
     if d is None or not isinstance(d, dict):
-        return templates.TemplateResponse(
-            request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": "无有效草稿。请先「保存 JSON」或「从素材生成」。"},
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {"level": "error", "message": "无有效草稿。请先「保存 JSON」或「从素材生成」。"},
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?pub_err=1",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     res = validate_for_publish(d)
     if not res.ok or res.content is None:
-        return templates.TemplateResponse(
-        request,
-        "teacher/partials/flash.html",
-        {
-                "level": "error",
-                "message": f"发布失败: {res.error} {'; '.join(res.warnings)}",
-            },
+        if htmx:
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/flash.html",
+                {
+                    "level": "error",
+                    "message": f"发布失败: {res.error} {'; '.join(res.warnings)}",
+                },
+            )
+        return RedirectResponse(
+            url=f"/teacher/chapters/{chapter_id}/edit?pub_err=1",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     ch.published_content = res.content
     ch.content_status = "published"
     ch.updated_at = datetime.now(timezone.utc)
     w = f" 警告: {'; '.join(res.warnings)}" if res.warnings else ""
-    return templates.TemplateResponse(
-        request,
-        "teacher/partials/flash.html",
-        {
-            "level": "ok",
-            "message": f"已发布。{w}",
-        },
+    if htmx:
+        return templates.TemplateResponse(
+            request,
+            "teacher/partials/flash.html",
+            {
+                "level": "ok",
+                "message": f"已发布。{w}",
+            },
+        )
+    return RedirectResponse(
+        url=f"/teacher/chapters/{chapter_id}/edit?pub_ok=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )

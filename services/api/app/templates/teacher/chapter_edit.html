@@ -9,13 +9,19 @@
   <a class="btn secondary" href="/teacher">返回列表</a>
 </div>
 
-<div id="flash" class="card" style="min-height:2.5rem"></div>
+<div id="flash" class="card" style="min-height:2.5rem">
+{% if ui_flash %}
+<p class="{% if ui_flash_level == 'ok' %}flash-ok{% else %}flash-err{% endif %}" role="status">{% if ui_flash_level == 'ok' %}✓{% else %}✗{% endif %} {{ ui_flash }}</p>
+{% endif %}
+</div>
 
 <div class="card">
   <h2 style="margin-top:0">草稿 JSON（<code>ai_generated_draft</code>）</h2>
-  <p>须符合 <strong>version 1</strong> 章 JSON；可粘贴后保存，再点发布。</p>
+  <p>须符合 <strong>version 1</strong> 章 JSON；可粘贴后保存，再点发布。若 HTMX（外网脚本）未加载，仍可用下面表单的常规提交；成功后会返回本页并显示提示。</p>
   <form
     id="fdraft"
+    method="post"
+    action="/teacher/chapters/{{ ch.id }}/save-draft"
     hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
     hx-target="#flash"
     hx-swap="innerHTML"
@@ -27,6 +33,8 @@
   </form>
   <p>
     <form
+      method="post"
+      action="/teacher/chapters/{{ ch.id }}/generate"
       hx-post="/teacher/chapters/{{ ch.id }}/generate"
       hx-target="#flash"
       hx-swap="innerHTML"
@@ -35,6 +43,8 @@
       <button type="submit" class="secondary">从素材用 LLM 生成</button>
     </form>
     <form
+      method="post"
+      action="/teacher/chapters/{{ ch.id }}/publish"
       hx-post="/teacher/chapters/{{ ch.id }}/publish"
       hx-target="#flash"
       hx-swap="innerHTML"
