@@ -46,6 +46,15 @@
   font: inherit;
 }
 
+.sd-okhint {
+  background: #14532d;
+  color: #bbf7d0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
 .sd-error {
   background: #3f1d1d;
   color: #fecaca;
@@ -61,6 +70,32 @@
   background: #1a2332;
   border-radius: 8px;
   padding: 1rem 1.1rem;
+}
+
+.sd-auth .sd-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.sd-tab {
+  background: #334155;
+  color: #94a3b8;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+.sd-tab.on {
+  background: #3b82f6;
+  color: #fff;
+}
+.sd-auth h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+.sd-auth .sm {
+  margin: 0 0 0.75rem;
 }
 
 .sd-card h2 {

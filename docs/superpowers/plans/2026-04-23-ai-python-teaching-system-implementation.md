@@ -264,7 +264,7 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 - [x] 执行 `pnpm create tauri-app`（配 **React/Vite**）；**构建**参数绑定 `VITE_API_BASE_URL`（同机默认 `http://127.0.0.1:8000`）。
 
-- [x] 一屏**流程**：**React** 内 **登录**（`POST /v1/student/login`）→ **章列表**（`GET /v1/student/chapters`）→ **章练习页** 内用 **`<iframe srcDoc="…">`** 占位；任务 12 可换为同壳内全页练习。API 在 `app/main.py` 对学生端 dev 来源（Vite 1420）已开 **CORS**。
+- [x] 一屏**流程**：**React** 内 **注册**（`POST /v1/student/register`，与名单一致）→ **登录**（`POST /v1/student/login`）→ **章列表**（`GET /v1/student/chapters`）→ **章练习**（任务 12 Pyodide）。API 在 `app/main.py` 对学生端 dev 来源（Vite 1420）已开 **CORS**。
 
 - [x] **Win/macOS 打包** 可先**本地**；**CI** 上**构建**为**可选项**（MVP 非必须）。**Linux** 下 `pnpm tauri build` 已可产出 deb / rpm / AppImage（**系统** 需 Tauri 文档所列 **libwebkit2gtk-4.1、GTK3** 等）。
 
