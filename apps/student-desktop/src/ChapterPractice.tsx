@@ -575,9 +575,6 @@ function ChapterPracticeInner({
             {completing ? "提交中…" : "提交本章练习"}
           </button>
           {completeMsg && <p className="jnb-footer-msg">{completeMsg}</p>}
-          <p className="jnb-footer-hint">
-            需每个 cell 在服务端记录为通过后才能完成；否则接口会返回 400。
-          </p>
         </div>
       </div>
       <StudentChat chapterId={chapterId} getContext={getChatContext} />

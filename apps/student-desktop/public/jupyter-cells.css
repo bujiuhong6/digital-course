@@ -474,11 +474,6 @@ pre.jnb-input-ro {
 }
 .jnb-footer-actions button:hover { background: #1d4ed8; }
 .jnb-footer-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-.jnb-footer-hint {
-  margin: 0.6rem 0 0;
-  font-size: 0.82rem;
-  color: var(--jnb-muted);
-}
 .jnb-footer-msg {
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
