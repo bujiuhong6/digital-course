@@ -200,6 +200,23 @@ function MessageBar({
   return null;
 }
 
+/** 解析 POST /complete 失败时的 `apiJson` 抛错（含 JSON body 字符串）。 */
+function parseChapterCompleteError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  try {
+    const o = JSON.parse(raw) as { detail?: unknown };
+    if (o.detail === "cells_not_all_passing") {
+      return "还有题目未通过。请完成本页各题并通过判定后再点击提交。";
+    }
+  } catch {
+    /* 非 JSON */
+  }
+  if (raw.includes("cells_not_all_passing")) {
+    return "还有题目未通过。请完成本页各题并通过判定后再点击提交。";
+  }
+  return "提交未成功。请检查网络后重试。";
+}
+
 function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
   if (!run) {
     return (
@@ -235,7 +252,13 @@ function ChapterPracticeInner({
 }) {
   const [codeMap, setCodeMap] = useState<Record<string, string>>({});
   const [cellState, setCellState] = useState<Record<string, CellState>>({});
-  const [completeMsg, setCompleteMsg] = useState<string | null>(null);
+  /** 仅当接口 200 成功时显示（jnb-footer-msg） */
+  const [completeSuccessText, setCompleteSuccessText] = useState<string | null>(
+    null,
+  );
+  const [completeErrorText, setCompleteErrorText] = useState<string | null>(
+    null,
+  );
   const [completing, setCompleting] = useState(false);
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
 
@@ -298,7 +321,8 @@ function ChapterPracticeInner({
         feedbackKind: "idle",
       },
     }));
-    setCompleteMsg(null);
+    setCompleteSuccessText(null);
+    setCompleteErrorText(null);
     setActiveCellId(id);
     const code = getCode(kind, cell);
     let run: Awaited<ReturnType<typeof runPythonInPyodide>>;
@@ -385,17 +409,18 @@ function ChapterPracticeInner({
 
   const onComplete = async () => {
     setCompleting(true);
-    setCompleteMsg(null);
+    setCompleteSuccessText(null);
+    setCompleteErrorText(null);
     try {
       const r = await apiJson<{ ok?: boolean; alreadyCompleted?: boolean }>(
         `/v1/student/chapters/${chapterId}/complete`,
         { method: "POST" },
       );
-      setCompleteMsg(
+      setCompleteSuccessText(
         r.alreadyCompleted ? "本章此前已标记完成" : "本章已标记完成",
       );
     } catch (e) {
-      setCompleteMsg(String(e));
+      setCompleteErrorText(parseChapterCompleteError(e));
     } finally {
       setCompleting(false);
     }
@@ -574,7 +599,14 @@ function ChapterPracticeInner({
           >
             {completing ? "提交中…" : "提交本章练习"}
           </button>
-          {completeMsg && <p className="jnb-footer-msg">{completeMsg}</p>}
+          {completeSuccessText ? (
+            <p className="jnb-footer-msg">{completeSuccessText}</p>
+          ) : null}
+          {completeErrorText ? (
+            <p className="jnb-footer-err" role="alert">
+              {completeErrorText}
+            </p>
+          ) : null}
         </div>
       </div>
       <StudentChat chapterId={chapterId} getContext={getChatContext} />

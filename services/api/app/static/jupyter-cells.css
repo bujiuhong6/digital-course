@@ -479,6 +479,11 @@ pre.jnb-input-ro {
   font-size: 0.9rem;
   color: #1e3a5f;
 }
+.jnb-footer-err {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: #9f1239;
+}
 
 /* 键帽（与参考图一致，若 HTML 中用到 <kbd>） */
 kbd,
