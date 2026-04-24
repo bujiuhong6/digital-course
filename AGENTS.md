@@ -12,6 +12,13 @@
 
 ---
 
+# Git 与实现计划（本仓库约定）
+
+- 对 `docs/superpowers/plans/2026-04-23-ai-python-teaching-system-implementation.md`：**每完成一截任务，就把该节里对应复选框标为 `[x]`**，与代码变更一起提交，避免 `main` 上仍显示未勾选。
+- **交付上 `main`**：在功能分支上做完并验证后，**合并到 `main` 并 `git push origin main`**（或经 PR 在 GitHub 上合并到 `main`），使远端 `main` 上的实现计划与代码一致。用户若要求「合并到 main」，在合并后**再核对**该文档中对应任务是否已为 `[x]`。
+
+---
+
 # 编码行为准则（Andrej Karpathy / andrej-karpathy-skills）
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
