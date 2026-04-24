@@ -5,13 +5,26 @@ import "./App.css";
 
 type Screen = "auth" | "chapters" | "chapter";
 
+type PracticeStatus = "pending" | "inProgress" | "submitted";
+
 type ChapterListItem = {
   chapterId: string;
   slug: string;
   title: string;
   order: number;
   updatedAt: string | null;
+  practiceStatus: PracticeStatus;
 };
+
+function practiceStatusLabel(s: PracticeStatus): string {
+  if (s === "submitted") {
+    return "已提交";
+  }
+  if (s === "inProgress") {
+    return "练习中";
+  }
+  return "待完成";
+}
 
 type ChapterBody = {
   id: string;
@@ -259,15 +272,26 @@ function App() {
           ) : (
             <ul className="sd-list">
               {chapters.map((c) => (
-                <li key={c.chapterId}>
-                  <button
-                    type="button"
-                    className="sd-link"
-                    onClick={() => void openChapter(c.chapterId)}
+                <li key={c.chapterId} className="sd-list-row">
+                  <div className="sd-list-main">
+                    <button
+                      type="button"
+                      className="sd-link"
+                      onClick={() => void openChapter(c.chapterId)}
+                    >
+                      {c.title}
+                    </button>
+                    <span className="sd-muted"> {c.slug}</span>
+                  </div>
+                  <span
+                    className="sd-list-status"
+                    title="本章练习进度"
+                    aria-label={`本章练习状态：${practiceStatusLabel(
+                      c.practiceStatus,
+                    )}`}
                   >
-                    {c.title}
-                  </button>
-                  <span className="sd-muted"> {c.slug}</span>
+                    {practiceStatusLabel(c.practiceStatus)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -283,6 +307,7 @@ function App() {
             onClick={() => {
               setSelected(null);
               setScreen("chapters");
+              void goChapters();
             }}
           >
             ← 返回列表

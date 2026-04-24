@@ -156,6 +156,37 @@ async def list_published_chapters(me: CurrentStudent, db: DBSession) -> dict:
         .order_by(Chapter.order, Chapter.title)
     )
     rows = r.scalars().all()
+    if not rows:
+        return {"ok": True, "chapters": []}
+
+    chapter_ids = [c.id for c in rows]
+
+    cr = await db.execute(
+        select(ChapterCompletion.chapter_id).where(
+            ChapterCompletion.student_id == me.id,
+            ChapterCompletion.chapter_id.in_(chapter_ids),
+        )
+    )
+    completed_ids = {row[0] for row in cr.all()}
+
+    pr = await db.execute(
+        select(CellVerification.chapter_id)
+        .where(
+            CellVerification.student_id == me.id,
+            CellVerification.chapter_id.in_(chapter_ids),
+            CellVerification.run_ok.is_(True),
+        )
+        .distinct()
+    )
+    has_pass_ids = {row[0] for row in pr.all()}
+
+    def _practice_status(cid: uuid.UUID) -> str:
+        if cid in completed_ids:
+            return "submitted"
+        if cid in has_pass_ids:
+            return "inProgress"
+        return "pending"
+
     return {
         "ok": True,
         "chapters": [
@@ -165,6 +196,7 @@ async def list_published_chapters(me: CurrentStudent, db: DBSession) -> dict:
                 "title": c.title,
                 "order": c.order,
                 "updatedAt": c.updated_at.isoformat() if c.updated_at else None,
+                "practiceStatus": _practice_status(c.id),
             }
             for c in rows
         ],

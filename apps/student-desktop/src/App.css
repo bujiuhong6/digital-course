@@ -149,6 +149,25 @@ body,
   border-bottom: 1px solid #2d3a4d;
 }
 
+.sd-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sd-list-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.sd-list-status {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: #8b9cb3;
+  white-space: nowrap;
+}
+
 .sd-link {
   background: none;
   border: none;

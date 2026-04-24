@@ -47,6 +47,7 @@ def test_task8_list_get_verify_complete(client) -> None:
     lst = client.get("/v1/student/chapters", headers=h)
     assert lst.status_code == 200
     assert len(lst.json()["chapters"]) == 1
+    assert lst.json()["chapters"][0].get("practiceStatus") == "pending"
     one = client.get(f"/v1/student/chapters/{ch_id}", headers=h)
     assert one.status_code == 200
     body = one.json()["chapter"]
@@ -72,6 +73,9 @@ def test_task8_list_get_verify_complete(client) -> None:
         headers=h,
     )
     assert c1.json().get("passed") is True
+
+    lst_mid = client.get("/v1/student/chapters", headers=h)
+    assert lst_mid.json()["chapters"][0].get("practiceStatus") == "inProgress"
 
     c2_bad = client.post(
         "/v1/student/cells/verify",
@@ -110,3 +114,6 @@ def test_task8_list_get_verify_complete(client) -> None:
     )
     assert comp2.status_code == 200
     assert comp2.json().get("alreadyCompleted") is True
+
+    lst_done = client.get("/v1/student/chapters", headers=h)
+    assert lst_done.json()["chapters"][0].get("practiceStatus") == "submitted"
