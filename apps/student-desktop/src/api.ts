@@ -48,13 +48,18 @@ export async function apiJson<T>(
   const r = await fetch(`${API_BASE}${path}`, { ...init, headers });
   const text = await r.text();
   if (!r.ok) {
-    let detail: unknown = text;
+    let errMsg = text || `HTTP ${r.status}`;
     try {
-      detail = JSON.parse(text);
+      const parsed = JSON.parse(text) as { detail?: unknown };
+      if (typeof parsed?.detail === "string") {
+        errMsg = parsed.detail;
+      } else if (parsed?.detail != null) {
+        errMsg = JSON.stringify(parsed.detail);
+      }
     } catch {
-      /* raw */
+      /* 非 JSON，沿用原文 */
     }
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    throw new Error(errMsg);
   }
   if (!text) {
     return {} as T;

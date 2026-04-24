@@ -159,8 +159,16 @@ async def student_chat(
             media_type="text/event-stream",
         )
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(url, json=jbody, headers=headers)
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(url, json=jbody, headers=headers)
+    except httpx.RequestError as e:
+        # 未连上上游：DNS/超时/断网/TLS 等，勿裸奔为 500
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"upstream_unavailable: {e!s}"[:2000],
+        ) from e
+
     if resp.status_code == 429:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="upstream 429"
@@ -171,11 +179,25 @@ async def student_chat(
         )
     try:
         out = resp.json()
-        text = out["choices"][0]["message"]["content"]
-    except (KeyError, json.JSONDecodeError) as e:
-        raise HTTPException(status_code=502, detail=f"bad upstream: {e!s}")
-    if not isinstance(text, str):
-        raise HTTPException(status_code=502, detail="empty assistant message")
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"bad upstream json: {e!s}; body: {resp.text[:800]!r}",
+        ) from e
+    try:
+        ch0 = out["choices"][0]
+        msg = ch0.get("message") or {}
+        text = msg.get("content")
+    except (KeyError, IndexError, TypeError) as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"bad upstream shape: {e!s}; keys={list(out)[:12]}",
+        ) from e
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(
+            status_code=502,
+            detail="empty assistant message from upstream (check model id and account)",
+        )
     return {
         "ok": True,
         "message": text,
@@ -186,18 +208,22 @@ async def student_chat(
 async def _stream_chat(
     url: str, jbody: dict, headers: dict
 ) -> AsyncIterator[bytes]:
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        async with client.stream("POST", url, json=jbody, headers=headers) as r:
-            if r.status_code >= 400:
-                err = (await r.aread())[:2000]
-                err_obj = {
-                    "error": f"http {r.status_code}",
-                    "body": err.decode("utf-8", errors="replace"),
-                }
-                yield f"data: {json.dumps(err_obj, ensure_ascii=False)}\n\n".encode()
-                return
-            async for line in r.aiter_lines():
-                if line == "":
-                    continue
-                yield (line if line.endswith("\n") else line + "\n").encode("utf-8")
-            yield b"data: [DONE]\n\n"
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream("POST", url, json=jbody, headers=headers) as r:
+                if r.status_code >= 400:
+                    err = (await r.aread())[:2000]
+                    err_obj = {
+                        "error": f"http {r.status_code}",
+                        "body": err.decode("utf-8", errors="replace"),
+                    }
+                    yield f"data: {json.dumps(err_obj, ensure_ascii=False)}\n\n".encode()
+                    return
+                async for line in r.aiter_lines():
+                    if line == "":
+                        continue
+                    yield (line if line.endswith("\n") else line + "\n").encode("utf-8")
+                yield b"data: [DONE]\n\n"
+    except httpx.RequestError as e:
+        err_obj = {"error": "upstream_unavailable", "detail": str(e)[:1500]}
+        yield f"data: {json.dumps(err_obj, ensure_ascii=False)}\n\n".encode()
