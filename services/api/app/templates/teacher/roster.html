@@ -18,7 +18,8 @@
 </p>
 {% endif %}
 
-<div class="card">
+<div class="card" id="roster-file-import">
+  <h2 style="margin-top:0">批量导入名单</h2>
   <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头须含 <strong>学号</strong>、<strong>姓名</strong>、<strong>班级</strong> 三列（「班级」可留空，系统会按名称建班/分班）。</p>
   <form
     hx-post="/teacher/roster/import"
@@ -56,28 +57,66 @@
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">已注册学生与班级</h2>
-  <p style="color:var(--muted);font-size:0.9rem">仅显示<strong>未分班</strong>的已注册学生。在「<a href="/teacher/classes">班级</a>」页新建班级后，在此为学生设班。已分入某班后请到该班详情页或名单导入调整；完成记录可按班级过滤。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-start;justify-content:space-between;margin-bottom:0.75rem">
+    <h2 style="margin:0">已注册学生与班级</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+      <a class="btn secondary" href="#roster-file-import">批量导入名单</a>
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/classes">班级</a>」页新建班级后，在此筛选、单条或批量设班；导入时填写「班级」列可自动建班/分班。完成记录可在章节提交页按班级过滤。</p>
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:0.75rem">
+    <label for="roster-class-filter" style="font-size:0.9rem;color:var(--muted)">按班级筛选</label>
+    <select id="roster-class-filter" onchange="location.href='/teacher/roster'+(this.value?('?classId='+encodeURIComponent(this.value)):'')">
+      <option value="" {% if not roster_class_id_filter or roster_class_id_filter == '' %}selected{% endif %}>全部班级</option>
+      <option value="unassigned" {% if roster_class_id_filter == 'unassigned' or roster_class_id_filter == 'none' %}selected{% endif %}>未分班</option>
+      {% for cl in classes %}
+      <option value="{{ cl.id }}" {% if roster_class_id_filter == (cl.id|string) %}selected{% endif %}>{{ cl.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if reg_students %}
+  <form id="roster-bulk-class-form" method="post" action="/teacher/students/bulk-set-class" style="margin:0 0 0.5rem 0">
+    <input type="hidden" name="return_class_id" value="{{ (roster_class_id_filter|default(''))|e }}" />
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+      <label for="bulk-class-id" class="visually-hidden">批量目标班级</label>
+      <select id="bulk-class-id" name="class_id" style="max-width:14rem" aria-label="将所选学生设为此班级">
+        <option value="">未分班（移出所有所选）</option>
+        {% for cl in classes %}
+        <option value="{{ cl.id }}">{{ cl.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="secondary" style="padding:0.35rem 0.6rem">批量设班</button>
+      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-student-tbody').querySelectorAll('input.js-roster-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=true">全选本页</button>
+      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-student-tbody').querySelectorAll('input.js-roster-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=false">取消全选</button>
+    </div>
+  </form>
+  {% endif %}
   {% if not reg_students %}
-  <p>尚无已注册学生。</p>
+  <p>当前筛选下尚无已注册学生。可先<a href="#roster-file-import">导入名单</a>后注册，或换筛选条件。</p>
   {% else %}
   <table>
     <thead>
       <tr>
+        <th style="width:2.5rem"><span class="visually-hidden">选择</span></th>
         <th>学号</th>
         <th>姓名</th>
         <th>班级</th>
         <th>操作</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="roster-student-tbody">
       {% for s in reg_students %}
       <tr>
+        <td>
+          <input class="js-roster-cb" type="checkbox" name="student_ids" value="{{ s.id }}" form="roster-bulk-class-form" />
+        </td>
         <td><code>{{ s.student_no }}</code></td>
         <td>{{ s.full_name }}</td>
         <td>{% if s.class %}{{ s.class.name }}{% else %}<span class="muted">未分班</span>{% endif %}</td>
         <td>
           <form method="post" action="/teacher/students/{{ s.id }}/set-class" style="display:inline-flex;gap:0.35rem;align-items:center;margin:0;flex-wrap:wrap">
+            <input type="hidden" name="return_to" value="roster" />
+            <input type="hidden" name="return_class_id" value="{{ (roster_class_id_filter|default(''))|e }}" />
             <label for="c-{{ s.id }}" style="font-size:0.85rem;color:var(--muted)">设班</label>
             <select id="c-{{ s.id }}" name="class_id" style="max-width:12rem">
               <option value="" {% if not s.class_id %}selected{% endif %}>未分班</option>

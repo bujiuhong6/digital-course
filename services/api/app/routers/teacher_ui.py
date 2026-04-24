@@ -406,8 +406,74 @@ async def ui_set_student_class(
                 url=f"/teacher/classes/{target}?saved=1",
                 status_code=status.HTTP_303_SEE_OTHER,
             )
+    rraw = (return_class_id or "").strip()
+    loc = "/teacher/roster?saved=1"
+    if rraw:
+        loc = f"/teacher/roster?saved=1&classId={quote(rraw)}"
     return RedirectResponse(
-        url="/teacher/roster?saved=1",
+        url=loc,
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/students/bulk-set-class", response_class=HTMLResponse)
+async def ui_bulk_set_student_class(
+    db: DBSession,
+    class_id: str = Form(""),
+    student_ids: list[str] | None = Form(None),
+    return_class_id: str = Form(""),
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """多选学生批量设班，同步同学号 `roster_entries.class_id`。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    ids: list[uuid.UUID] = []
+    for s in (student_ids or []):
+        s = (s or "").strip()
+        if not s:
+            continue
+        try:
+            ids.append(uuid.UUID(s))
+        except ValueError:
+            continue
+    if not ids:
+        err_q = "err=bulk_none"
+        rraw = (return_class_id or "").strip()
+        if rraw:
+            err_q += f"&classId={quote(rraw)}"
+        return RedirectResponse(
+            url=f"/teacher/roster?{err_q}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    target_cid: uuid.UUID | None
+    if not (class_id or "").strip():
+        target_cid = None
+    else:
+        try:
+            target_cid = uuid.UUID((class_id or "").strip())
+        except ValueError:
+            return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
+        c = (await db.execute(select(ClassModel).where(ClassModel.id == target_cid))).scalar_one_or_none()
+        if c is None:
+            return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
+    for sid in ids:
+        st = (
+            await db.execute(select(Student).where(Student.id == sid))
+        ).scalar_one_or_none()
+        if st is None:
+            continue
+        st.class_id = target_cid
+        re_row = (
+            await db.execute(select(RosterEntry).where(RosterEntry.student_no == st.student_no))
+        ).scalar_one_or_none()
+        if re_row is not None and re_row.deleted_at is None:
+            re_row.class_id = target_cid
+    rraw = (return_class_id or "").strip()
+    loc = "/teacher/roster?saved=1"
+    if rraw:
+        loc = f"/teacher/roster?saved=1&classId={quote(rraw)}"
+    return RedirectResponse(
+        url=loc,
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -570,6 +636,11 @@ async def export_chapter_completions_csv(
 async def page_roster(
     request: Request,
     db: DBSession,
+    class_id: str | None = Query(
+        default=None,
+        alias="classId",
+        description="筛选：空=全部；`none` 或 `unassigned` 为未分班；否则为班级 UUID。",
+    ),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
     if not await teacher_cookie_valid(teacher_session, db):
@@ -588,12 +659,21 @@ async def page_roster(
         select(ClassModel).order_by(ClassModel.name)
     )
     classes = r_cls.scalars().all()
-    r_stu = await db.execute(
-        select(Student, ClassModel)
-        .outerjoin(ClassModel, Student.class_id == ClassModel.id)
-        .where(Student.class_id.is_(None))
-        .order_by(Student.student_no)
+    st_q = select(Student, ClassModel).outerjoin(
+        ClassModel, Student.class_id == ClassModel.id
     )
+    raw_filter = (class_id or "").strip()
+    if raw_filter.lower() in ("none", "unassigned"):
+        st_q = st_q.where(Student.class_id.is_(None))
+    elif raw_filter:
+        try:
+            fcid = uuid.UUID(raw_filter)
+        except ValueError:
+            fcid = None
+        if fcid is not None:
+            st_q = st_q.where(Student.class_id == fcid)
+    st_q = st_q.order_by(Student.student_no)
+    r_stu = await db.execute(st_q)
     student_rows = r_stu.all()
     reg_students: list[dict] = [
         {
@@ -611,6 +691,8 @@ async def page_roster(
         r_level, r_flash = "ok", "已更新班级。"
     elif request.query_params.get("err") == "class":
         r_level, r_flash = "err", "班级无效，请重试。"
+    elif request.query_params.get("err") == "bulk_none":
+        r_level, r_flash = "err", "请至少勾选一名学生后再批量设班。"
     return templates.TemplateResponse(
         request,
         "teacher/roster.html",
@@ -620,6 +702,7 @@ async def page_roster(
             "reg_students": reg_students,
             "roster_flash": r_flash,
             "roster_flash_level": r_level,
+            "roster_class_id_filter": raw_filter,
         },
     )
 
