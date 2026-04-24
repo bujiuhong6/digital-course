@@ -3,7 +3,7 @@ import { API_BASE, apiJson, clearToken, getToken, setToken } from "./api";
 import { ChapterPractice } from "./ChapterPractice";
 import "./App.css";
 
-type Screen = "login" | "chapters" | "chapter";
+type Screen = "auth" | "chapters" | "chapter";
 
 type ChapterListItem = {
   chapterId: string;
@@ -24,10 +24,14 @@ type ChapterBody = {
 };
 
 function App() {
-  const [screen, setScreen] = useState<Screen>("login");
+  const [screen, setScreen] = useState<Screen>("auth");
+  const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [err, setErr] = useState<string | null>(null);
+  const [okHint, setOkHint] = useState<string | null>(null);
   const [studentNo, setStudentNo] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
   const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [selected, setSelected] = useState<ChapterBody | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +52,7 @@ function App() {
 
   useEffect(() => {
     if (getToken()) {
-      goChapters().catch(() => setScreen("login"));
+      goChapters().catch(() => setScreen("auth"));
     }
   }, [goChapters]);
 
@@ -56,6 +60,7 @@ function App() {
     e.preventDefault();
     setLoading(true);
     setErr(null);
+    setOkHint(null);
     try {
       const data = await apiJson<{
         accessToken: string;
@@ -73,11 +78,46 @@ function App() {
     }
   }
 
+  async function onRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setErr(null);
+    setOkHint(null);
+    if (password !== password2) {
+      setErr("两次输入的密码不一致。");
+      setLoading(false);
+      return;
+    }
+    try {
+      await apiJson<{ ok: boolean; studentId: string }>(
+        "/v1/student/register",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            studentNo,
+            fullName,
+            password,
+          }),
+        },
+        { noAuth: true },
+      );
+      setPassword("");
+      setPassword2("");
+      setOkHint("注册成功。请用刚才的学号与密码登录。");
+      setAuthTab("login");
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function onLogout() {
     clearToken();
     setChapters([]);
     setSelected(null);
-    setScreen("login");
+    setScreen("auth");
+    setAuthTab("login");
   }
 
   async function openChapter(id: string) {
@@ -110,32 +150,108 @@ function App() {
         )}
       </header>
 
+      {okHint && <div className="sd-okhint">{okHint}</div>}
       {err && <div className="sd-error">{err}</div>}
 
-      {screen === "login" && (
-        <form className="sd-card" onSubmit={onLogin}>
-          <h2>登录</h2>
-          <label>
-            学号
-            <input
-              value={studentNo}
-              onChange={(e) => setStudentNo(e.target.value)}
-              autoComplete="username"
-            />
-          </label>
-          <label>
-            密码
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          <button type="submit" disabled={loading}>
-            {loading ? "…" : "进入"}
-          </button>
-        </form>
+      {screen === "auth" && (
+        <div className="sd-card sd-auth">
+          <div className="sd-tabs">
+            <button
+              type="button"
+              className={authTab === "login" ? "sd-tab on" : "sd-tab"}
+              onClick={() => {
+                setAuthTab("login");
+                setErr(null);
+                setOkHint(null);
+              }}
+            >
+              登录
+            </button>
+            <button
+              type="button"
+              className={authTab === "register" ? "sd-tab on" : "sd-tab"}
+              onClick={() => {
+                setAuthTab("register");
+                setErr(null);
+                setOkHint(null);
+              }}
+            >
+              注册
+            </button>
+          </div>
+          {authTab === "login" ? (
+            <form onSubmit={onLogin}>
+              <h2>登录</h2>
+              <p className="sd-muted sm">
+                学号、姓名需已由教师在名单导入，且与注册时一致。
+              </p>
+              <label>
+                学号
+                <input
+                  value={studentNo}
+                  onChange={(e) => setStudentNo(e.target.value)}
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                密码
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </label>
+              <button type="submit" disabled={loading}>
+                {loading ? "…" : "进入"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={onRegister}>
+              <h2>注册</h2>
+              <p className="sd-muted sm">
+                学号、姓名须与教师导入名单一字不差（含空格）。注册成功后切到「登录」。
+              </p>
+              <label>
+                学号
+                <input
+                  value={studentNo}
+                  onChange={(e) => setStudentNo(e.target.value)}
+                  autoComplete="username"
+                />
+              </label>
+              <label>
+                姓名
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="name"
+                />
+              </label>
+              <label>
+                设置密码
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label>
+                确认密码
+                <input
+                  type="password"
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </label>
+              <button type="submit" disabled={loading}>
+                {loading ? "…" : "注册"}
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       {screen === "chapters" && (
