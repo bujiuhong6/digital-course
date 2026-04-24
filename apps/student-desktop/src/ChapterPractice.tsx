@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
 import { apiJson } from "./api";
-import { runPythonInPyodide, ensurePyodide } from "./pyodideRunner";
+import {
+  runPythonInPyodide,
+  ensurePyodide,
+  type RunResult,
+} from "./pyodideRunner";
 
 type PassRule = {
   mode: string;
@@ -48,7 +52,13 @@ type Props = {
 
 type CellKind = "guide" | "extension";
 
-type CellState = { passed: boolean | null; loading: boolean; lastMsg: string | null };
+type CellState = {
+  passed: boolean | null;
+  loading: boolean;
+  lastMsg: string | null;
+  /** 最近一次在浏览器内运行结果（stdout/异常） */
+  lastRun: RunResult | null;
+};
 
 function htmlMd(html: string, key: string) {
   return (
@@ -57,6 +67,47 @@ function htmlMd(html: string, key: string) {
       className="jnb-md-cell"
       dangerouslySetInnerHTML={{ __html: html }}
     />
+  );
+}
+
+function formatRunForDisplay(r: RunResult): string {
+  if (!r.runOk) {
+    const parts: string[] = [];
+    if (r.errorExcerpt) {
+      parts.push(r.errorExcerpt);
+    }
+    if (r.stderr) {
+      parts.push(`[stderr]\n${r.stderr}`);
+    }
+    if (r.stdout) {
+      parts.push(`[stdout]\n${r.stdout}`);
+    }
+    return parts.length > 0 ? parts.join("\n\n") : "运行未成功（无详细消息）。";
+  }
+  const o = (r.stdout || "").trimEnd();
+  const e = (r.stderr || "").trimEnd();
+  if (e) {
+    return o ? `${o}\n\n[stderr]\n${e}` : `[stderr]\n${e}`;
+  }
+  return o || "（无标准输出）";
+}
+
+function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
+  if (!run) {
+    return null;
+  }
+  const bad = !run.runOk;
+  return (
+    <div className="jnb-out">
+      <div className="jnb-out-label">Out：</div>
+      <pre
+        className={["jnb-out-text", bad ? "jnb-out-text--bad" : ""]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {formatRunForDisplay(run)}
+      </pre>
+    </div>
   );
 }
 
@@ -108,7 +159,12 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
     const id = cell.id;
     setCellState((s) => ({
       ...s,
-      [id]: { passed: null, loading: true, lastMsg: null },
+      [id]: {
+        passed: null,
+        loading: true,
+        lastMsg: null,
+        lastRun: null,
+      },
     }));
     setCompleteMsg(null);
     const code = getCode(kind, cell);
@@ -124,10 +180,30 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
       setPyErr(err);
       setCellState((s) => ({
         ...s,
-        [id]: { passed: false, loading: false, lastMsg: err },
+        [id]: {
+          passed: false,
+          loading: false,
+          lastMsg: err,
+          lastRun: {
+            stdout: "",
+            stderr: "",
+            runOk: false,
+            errorExcerpt: err,
+            elapsedMs: 0,
+          },
+        },
       }));
       return;
     }
+    setCellState((s) => ({
+      ...s,
+      [id]: {
+        passed: s[id]?.passed ?? null,
+        loading: true,
+        lastMsg: s[id]?.lastMsg ?? null,
+        lastRun: run,
+      },
+    }));
     try {
       const res = await apiJson<{
         ok: boolean;
@@ -151,12 +227,18 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
           passed: res.passed,
           loading: false,
           lastMsg: res.passed ? "本关已记录为通过" : "未通过（见过关规则或输出）",
+          lastRun: run,
         },
       }));
     } catch (e) {
       setCellState((s) => ({
         ...s,
-        [id]: { passed: false, loading: false, lastMsg: String(e) },
+        [id]: {
+          passed: false,
+          loading: false,
+          lastMsg: String(e),
+          lastRun: run,
+        },
       }));
     }
   };
@@ -296,6 +378,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
                   </span>
                 )}
               </div>
+              <RunOutputBlock run={cellState[b.guideCell.id]?.lastRun} />
 
               <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
                 扩展
@@ -359,6 +442,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
                   </span>
                 )}
               </div>
+              <RunOutputBlock run={cellState[b.extensionCell.id]?.lastRun} />
             </section>
           );
         })}

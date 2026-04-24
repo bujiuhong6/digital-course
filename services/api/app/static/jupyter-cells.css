@@ -251,6 +251,43 @@ pre.jnb-input-ro {
 
 .jnb-ok { color: #15803d; font-weight: 500; }
 .jnb-warn { color: #b45309; }
+.jnb-err { color: #b91c1c; }
+
+/* 单次运行结果（Out：stdout / 异常，仿 Notebook 输出区） */
+.jnb-out {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.45rem 0.65rem 0.5rem 4.7rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+  color: #334155;
+  line-height: 1.45;
+  border-left: 2px solid #cbd5e1;
+  margin-left: 0.15rem;
+}
+.jnb-out-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--jnb-muted);
+  margin-bottom: 0.15rem;
+}
+.jnb-out pre.jnb-out-text {
+  margin: 0.2rem 0 0;
+  padding: 0.45rem 0.6rem;
+  background: #f8fafc;
+  border: 1px solid var(--jnb-border);
+  border-radius: 4px;
+  font: 0.8rem/1.45 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color: #0f172a;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 10rem;
+  overflow: auto;
+}
+.jnb-out pre.jnb-out-text--bad {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #7f1d1d;
+}
 
 /* 过关规则（与提示区分：左侧强调条） */
 .jnb-pass {

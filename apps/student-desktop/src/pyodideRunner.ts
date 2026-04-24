@@ -16,7 +16,9 @@ export type RunResult = {
   elapsedMs: number;
 };
 
-const defaultScript = "https://cdn.jsdelivr.net/pyodide/v0.27.0/pyodide.js";
+/* jsdelivr 上主包根目录的 pyodide.js 为 404；须用 full/ 下入口脚本 */
+const defaultScript =
+  "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js";
 function scriptUrl(): string {
   const u = import.meta.env.VITE_PYODIDE_SCRIPT_URL;
   if (u && String(u).trim()) {
