@@ -75,6 +75,17 @@ class Settings(BaseSettings):
         default=0,
         description="0 表示不限制。",
     )
+    # OpenRouter 可选头（见 openrouter.ai 文档；用于在排行榜展示来源，非鉴权所必需）
+    openrouter_http_referer: str = Field(
+        default="",
+        description="发向 openrouter.ai 时可选的 HTTP-Referer。",
+        validation_alias=AliasChoices("OPENROUTER_HTTP_REFERER", "OPENROUTER_REFERER"),
+    )
+    openrouter_title: str = Field(
+        default="",
+        description="发向 openrouter.ai 时可选的 X-OpenRouter-Title。",
+        validation_alias=AliasChoices("OPENROUTER_TITLE",),
+    )
 
     @field_validator("llm_base_url", "chat_llm_base_url", mode="before")
     @classmethod
@@ -84,6 +95,30 @@ class Settings(BaseSettings):
         return normalize_openai_compat_base_url(v)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+def extra_headers_for_openai_compat_provider(base_url_normalized: str) -> dict[str, str]:
+    """
+    对 OpenAI 兼容网关追加厂商推荐的可选头（当前仅对 OpenRouter 基址识别）。
+    """
+    b = (base_url_normalized or "").lower()
+    h: dict[str, str] = {}
+    if "openrouter.ai" not in b:
+        return h
+    s = settings
+    r = (s.openrouter_http_referer or "").strip()
+    t = (s.openrouter_title or "").strip()
+    if r:
+        h["HTTP-Referer"] = r
+    if t:
+        h["X-OpenRouter-Title"] = t
+    return h
+
+
+def merge_openai_compat_llm_headers(
+    base_url_normalized: str, headers: dict[str, str]
+) -> dict[str, str]:
+    return {**headers, **extra_headers_for_openai_compat_provider(base_url_normalized)}
 
 
 settings = Settings()

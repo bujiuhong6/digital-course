@@ -21,7 +21,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from ..config import normalize_openai_compat_base_url, settings
+from ..config import (
+    merge_openai_compat_llm_headers,
+    normalize_openai_compat_base_url,
+    settings,
+)
 from ..db.models import Chapter
 from ..deps import CurrentStudent, DBSession
 from ..services.chat_limiter import check_and_record_request
@@ -120,13 +124,13 @@ async def student_chat(
     )
     if not base:
         # 开发/测试：不调用外网
-        payload = {
+        mock_body = {
             "ok": True,
             "mock": True,
             "message": "Chat LLM not configured; set CHAT_LLM_BASE_URL (or use LLM_BASE_URL).",
             "at": datetime.now(timezone.utc).isoformat(),
         }
-        return JSONResponse(content=payload)
+        return JSONResponse(content=mock_body)
 
     url = f"{base}/v1/chat/completions"
     api_key = settings.chat_llm_api_key or settings.llm_api_key
@@ -144,9 +148,10 @@ async def student_chat(
     }
     if payload.stream:
         jbody["stream"] = True
-    headers = {"Content-Type": "application/json"}
+    headers: dict[str, str] = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    headers = merge_openai_compat_llm_headers(base, headers)
 
     if payload.stream:
         return StreamingResponse(
