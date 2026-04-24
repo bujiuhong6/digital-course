@@ -214,7 +214,16 @@ async def get_published_chapter(
     ch = r.scalar_one_or_none()
     if ch is None:
         raise HTTPException(status_code=404, detail="chapter not found or not published")
-    return {"ok": True, "chapter": _public_chapter_dict(ch)}
+    cr = await db.execute(
+        select(ChapterCompletion).where(
+            ChapterCompletion.student_id == me.id,
+            ChapterCompletion.chapter_id == chapter_id,
+        )
+    )
+    has_completed = cr.scalar_one_or_none() is not None
+    d = _public_chapter_dict(ch)
+    d["hasCompletedChapter"] = has_completed
+    return {"ok": True, "chapter": d}
 
 
 class CellVerifyBody(BaseModel):

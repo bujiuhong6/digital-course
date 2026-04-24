@@ -55,6 +55,7 @@ def test_task8_list_get_verify_complete(client) -> None:
     assert "aiGeneratedDraft" not in body
     assert body.get("contentStatus") == "published"
     assert body.get("publishedContent", {}).get("version") == 1
+    assert body.get("hasCompletedChapter") is False
 
     bad_complete = client.post(
         f"/v1/student/chapters/{ch_id}/complete", headers=h
@@ -117,3 +118,5 @@ def test_task8_list_get_verify_complete(client) -> None:
 
     lst_done = client.get("/v1/student/chapters", headers=h)
     assert lst_done.json()["chapters"][0].get("practiceStatus") == "submitted"
+    ch_one = client.get(f"/v1/student/chapters/{ch_id}", headers=h).json()["chapter"]
+    assert ch_one.get("hasCompletedChapter") is True

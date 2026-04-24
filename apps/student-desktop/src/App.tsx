@@ -52,6 +52,8 @@ type ChapterBody = {
   contentStatus: string;
   publishedContent: Record<string, unknown> | null;
   updatedAt: string | null;
+  /** 服务端是否已记录本章完成 */
+  hasCompletedChapter?: boolean;
 };
 
 function App() {
@@ -358,6 +360,7 @@ function App() {
               chapterId={selected.id}
               title={selected.title}
               publishedContent={selected.publishedContent}
+              initialChapterCompleted={!!selected.hasCompletedChapter}
             />
           ) : selected.publishedContent ? (
             <p className="sd-muted">正在加载学生信息…</p>
