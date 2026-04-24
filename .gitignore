@@ -3,3 +3,7 @@
 .env.local
 .env.*.local
 *.pem
+
+# Local agent screenshots (not part of the repo)
+artifacts/
+teacher-login-demo.png
