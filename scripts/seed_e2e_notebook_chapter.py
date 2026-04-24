@@ -31,7 +31,13 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 
 from app.db import models  # noqa: F401, E402
 from app.db.base import Base  # noqa: E402
-from app.db.models import AdminConfig, Chapter, RosterEntry, Student  # noqa: E402
+from app.db.models import (  # noqa: E402
+    AdminConfig,
+    Chapter,
+    ChapterCompletion,
+    RosterEntry,
+    Student,
+)
 from app.services.crypto import encrypt_password  # noqa: E402
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -140,6 +146,14 @@ async def main() -> None:
                 published_content=published_content(),
             )
         )
+        if os.environ.get("SEED_DEMO_COMPLETION", "").strip() in ("1", "true", "yes"):
+            db.add(
+                ChapterCompletion(
+                    id=uuid.uuid4(),
+                    student_id=st.id,
+                    chapter_id=ch_id,
+                )
+            )
         await db.commit()
     await engine.dispose()
     print("DATABASE_FILE=" + out, file=sys.stderr)
