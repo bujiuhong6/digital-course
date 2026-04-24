@@ -210,15 +210,15 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 改 `student.py`
 
-- [ ] **GET** 只返回**已发布**章；**GET 单章** 去掉**草稿**字段。
+- [x] **GET** 只返回**已发布**章；**GET 单章** 去掉**草稿**字段。
 
-- [ ] **POST** `/v1/student/cells/verify`：按「学生+章+cell」**只保留最新**一条或覆盖更新 `cell_verifications`。
+- [x] **POST** `/v1/student/cells/verify`：按「学生+章+cell」**只保留最新**一条或覆盖更新 `cell_verifications`。
 
-- [ ] **POST 本章完成**：从章 **JSON** 展开必做 `cell` id 列表，**全部** `run_ok` 才插入 `chapter_completions`；重复提交**幂等 200**。
+- [x] **POST 本章完成**：从章 **JSON** 展开必做 `cell` id 列表，**全部** `run_ok` 才插入 `chapter_completions`；重复提交**幂等 200**。
 
-- [ ] **测试**：**缺 cell 未完成**时**应失败**。
+- [x] **测试**：**缺 cell 未完成**时**应失败**。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 
