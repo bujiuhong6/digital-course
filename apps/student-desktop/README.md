@@ -8,9 +8,14 @@
 - **Rust**（Tauri 2；建议 **stable 1.8x+**）
 - 平台依赖见 [Tauri Linux prerequisites](https://tauri.app/start/prerequisites/)（本机构建时已安装 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等）
 
-## 配置 API 根地址
+## 配置
 
-复制 `.env.example` 为 `.env`，修改 `VITE_API_BASE_URL` 指向已运行的 API（无尾部斜杠）。开发时同机一般为 `http://127.0.0.1:8000`。
+复制 `.env.example` 为 `.env`。
+
+- `VITE_API_BASE_URL`：已运行的教学 API 根（无尾部斜杠），同机一般为 `http://127.0.0.1:8000`。
+- `VITE_PYODIDE_INDEX_URL`（**可选**）：Pyodide `full/` 包目录的 URL，须以 `/` 结尾。默认与 `index.html` 中加载的 0.27 版本一致；**离线/内网**时可自建镜像并只改本变量与 `index.html` 中的 `pyodide.js` 地址。
+
+**任务 12**：在 WebView 中加载 **Pyodide**（`index.html` 从 CDN 引入；首次运行会拉取包体）。进入已发布章后，按 `publishedContent.version===1` 的 `blocks` 展示**引导/扩展** cell；「运行并上报」执行代码并 `POST /v1/student/cells/verify`；全部通过后可「标记本章完成」。
 
 ## 开发
 

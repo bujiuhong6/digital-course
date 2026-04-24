@@ -8,6 +8,10 @@
   font-family: system-ui, sans-serif;
 }
 
+.sd-root.sd-wide {
+  max-width: 52rem;
+}
+
 .sd-header h1 {
   margin: 0 0 0.25rem;
   font-size: 1.35rem;
@@ -128,4 +132,139 @@
   border: 1px solid #2d3a4d;
   border-radius: 6px;
   background: #0b1220;
+}
+
+.sd-prose {
+  line-height: 1.5;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.sd-prose p {
+  margin: 0.35rem 0;
+}
+
+.sd-chapter {
+  margin-top: 0.5rem;
+}
+
+.sd-chapter-title {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.sd-block {
+  border-top: 1px solid #2d3a4d;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+}
+
+.sd-block h3 {
+  margin: 0.6rem 0 0.35rem;
+  font-size: 1rem;
+  color: #94a3b8;
+}
+
+.sd-cell-desc {
+  margin: 0.25rem 0 0.5rem;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.sd-code-label {
+  display: block;
+  font-size: 0.8rem;
+  color: #8b9cb3;
+  margin-bottom: 0.25rem;
+}
+
+.sd-code {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #2d3a4d;
+  border-radius: 6px;
+  background: #0c1018;
+  color: #e2e8f0;
+  resize: vertical;
+}
+
+.sd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.4rem 0 0.75rem;
+}
+
+.sd-row button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sd-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sd-ok {
+  color: #86efac;
+  font-size: 0.85rem;
+}
+
+.sd-warn {
+  color: #fcd34d;
+  font-size: 0.85rem;
+}
+
+.sd-bad {
+  color: #fca5a5;
+  font-size: 0.85rem;
+}
+
+.sd-sm {
+  font-size: 0.8rem;
+}
+
+.sd-pyodide-bar {
+  margin: 0.5rem 0 0.75rem;
+  min-height: 1.4rem;
+}
+
+.sd-pyodide-bar button {
+  margin-left: 0.25rem;
+  background: #334155;
+  color: #e2e8f0;
+  border: none;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sd-complete {
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #2d3a4d;
+}
+
+.sd-complete button {
+  background: #059669;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sd-complete button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
