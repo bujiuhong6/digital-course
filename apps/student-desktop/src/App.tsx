@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { API_BASE, apiJson, clearToken, getToken, setToken } from "./api";
+import { apiJson, clearToken, getToken, setToken } from "./api";
 import { ChapterPractice } from "./ChapterPractice";
 import "./App.css";
 
@@ -140,9 +140,6 @@ function App() {
     <main className={`sd-root${screen === "chapter" ? " sd-wide" : ""}`}>
       <header className="sd-header">
         <h1>章节练习（学生用）</h1>
-        <p className="sd-meta">
-          API: <code>{API_BASE}</code>（<code>VITE_API_BASE_URL</code>）
-        </p>
         {getToken() && (
           <button type="button" className="sd-btn-ghost" onClick={onLogout}>
             退出
