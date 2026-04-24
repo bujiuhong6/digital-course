@@ -4,6 +4,10 @@
 <h1>教师登录</h1>
 <p>与 API 同域；成功后会设置 <code>teacher_session</code> Cookie。</p>
 
+{% if login_error %}
+<p class="flash-err" role="alert">{{ login_error }}</p>
+{% endif %}
+
 {% if not need_bootstrap %}
 <form method="post" action="/teacher/do-login" class="card">
   <label for="p">密码</label>
