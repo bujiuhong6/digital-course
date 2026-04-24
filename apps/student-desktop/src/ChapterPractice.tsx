@@ -2,7 +2,11 @@ import { useCallback, useState } from "react";
 import { apiJson } from "./api";
 import { runPythonInPyodide, ensurePyodide } from "./pyodideRunner";
 
-type PassRule = { mode: string; expectedSubstring?: string };
+type PassRule = {
+  mode: string;
+  expectedSubstring?: string;
+  assertCode?: string;
+};
 
 type GuideCell = {
   id: string;
@@ -176,145 +180,202 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
   };
 
   return (
-    <div className="sd-chapter jnb-practice-surface">
-      <h2 className="sd-chapter-title">{title}</h2>
-      <p className="sd-muted sm" style={{ margin: "0 0 0.5rem" }}>
-        Notebook 式练习（内嵌 Pyodide，与 design §2/§5 一致；非 Jupyter 官方应用）。
-      </p>
-      <div className="sd-pyodide-bar">
-        {pyStatus === "idle" && (
-          <span className="sd-muted sm">
-            点「运行并上报」将自动下载并初始化 Pyodide（首次可能较慢），也可
-            <button type="button" onClick={() => void prewarmPyodide()}>
-              先预载
-            </button>
-            。
-          </span>
-        )}
-        {pyStatus === "loading" && <span>正在预载 Pyodide…</span>}
-        {pyStatus === "ready" && <span className="sd-ok">Pyodide 已就绪</span>}
-        {pyStatus === "err" && (
-          <span className="sd-bad">Pyodide：{pyErr || "不可用"}</span>
-        )}
-      </div>
-      {publishedContent.blocks.map((b, bi) => {
-        const i0 = bi * 3 + 1;
-        const iGuide = i0 + 1;
-        const iExt = i0 + 2;
-        return (
-          <section key={b.id} className="jnb-surface">
-            <div className="jnb-block-title">第 {bi + 1} 块</div>
-            {b.requiredExecutionMode && (
-              <p className="jnb-hint" style={{ paddingLeft: 0, marginTop: 0 }}>
-                本章要求执行模式：{b.requiredExecutionMode}（见 design §5）
-              </p>
-            )}
-            <div className="jnb-code-cell">
-              <span className="jnb-prompt">In [{i0}]:</span>
-              <div className="jnb-code-col">
-                {htmlMd(b.knowledgeHtml || "<p></p>", `${b.id}-kn`)}
-              </div>
-            </div>
-
-            <div className="jnb-block-title" style={{ marginTop: "0.75rem" }}>
-              引导
-            </div>
-            {b.guideCell.description && (
-              <p className="jnb-hint" style={{ paddingLeft: 0 }}>
-                {b.guideCell.description}
-              </p>
-            )}
-            <div className="jnb-code-cell">
-              <span className="jnb-prompt">In [{iGuide}]:</span>
-              <div className="jnb-code-col">
-                <textarea
-                  className="jnb-input"
-                  value={getCode("guide", b.guideCell)}
-                  onChange={(e) => setCode(b.guideCell.id, e.target.value)}
-                  rows={5}
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-            <div className="jnb-run-row">
+    <div
+      className="sd-chapter jnb-student-embed"
+      style={{ marginTop: "0.5rem" }}
+    >
+      <div
+        className="jnb-page"
+        style={{ border: "none", margin: 0, maxWidth: "none" }}
+      >
+        <h2 className="jnb-hero-title">{title}</h2>
+        <p className="jnb-hero-lead">
+          Notebook
+          式练习（内嵌 Pyodide，与 design
+          文档一致；运行环境在浏览器中，为教学用途的轻量实现）。
+        </p>
+        <div className="jnb-py-box" role="status">
+          {pyStatus === "idle" && (
+            <>
+              点「运行并上报」将自动下载并初始化 Pyodide（首次可能较慢）。也可
               <button
                 type="button"
-                onClick={() => void runAndVerify("guide", b.guideCell)}
-                disabled={cellState[b.guideCell.id]?.loading}
+                className="jnb-preload-link"
+                onClick={() => void prewarmPyodide()}
               >
-                {cellState[b.guideCell.id]?.loading ? "运行中…" : "运行并上报"}
+                先预载运行环境
               </button>
-              {cellState[b.guideCell.id]?.lastMsg && (
-                <span
-                  className={
-                    cellState[b.guideCell.id]?.passed ? "jnb-ok" : "jnb-warn"
-                  }
+              。
+            </>
+          )}
+          {pyStatus === "loading" && <span>正在预载 Pyodide…</span>}
+          {pyStatus === "ready" && (
+            <span className="jnb-status-ok">Pyodide 已就绪</span>
+          )}
+          {pyStatus === "err" && (
+            <span className="jnb-status-err">
+              Pyodide：{pyErr || "不可用"}
+            </span>
+          )}
+        </div>
+        {publishedContent.blocks.map((b, bi) => {
+          const i0 = bi * 3 + 1;
+          const iGuide = i0 + 1;
+          const iExt = i0 + 2;
+          return (
+            <section key={b.id} className="jnb-section">
+              <div className="jnb-sec-h">
+                第 <strong>{bi + 1}</strong> 块
+              </div>
+              {b.requiredExecutionMode && (
+                <p
+                  className="jnb-hint"
+                  style={{ paddingLeft: 0, marginTop: 0 }}
                 >
-                  {cellState[b.guideCell.id]?.lastMsg}
-                </span>
+                  本章要求执行模式：<code>{b.requiredExecutionMode}</code>
+                </p>
               )}
-            </div>
+              <div className="jnb-code-cell">
+                <span className="jnb-prompt">In [{i0}]:</span>
+                <div className="jnb-code-col">
+                  {htmlMd(b.knowledgeHtml || "<p></p>", `${b.id}-kn`)}
+                </div>
+              </div>
 
-            <div className="jnb-block-title" style={{ marginTop: "0.75rem" }}>
-              扩展
-            </div>
-            <div className="jnb-code-cell">
-              <span className="jnb-prompt">（说明）</span>
-              <div className="jnb-code-col">
-                {htmlMd(
-                  b.extensionCell.promptHtml || "<p></p>",
-                  `${b.id}-ex`,
+              <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
+                引导
+              </div>
+              {b.guideCell.description && (
+                <p className="jnb-cell-desc" style={{ marginTop: 0 }}>
+                  {b.guideCell.description}
+                </p>
+              )}
+              <div className="jnb-code-cell">
+                <span className="jnb-prompt">In [{iGuide}]:</span>
+                <div className="jnb-code-col">
+                  <textarea
+                    className="jnb-input"
+                    value={getCode("guide", b.guideCell)}
+                    onChange={(e) => setCode(b.guideCell.id, e.target.value)}
+                    rows={5}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+              <p className="jnb-pass">
+                过关：模式 <code>{b.guideCell.passRule?.mode}</code>
+                {b.guideCell.passRule?.expectedSubstring ? (
+                  <>
+                    ，stdout 须含{" "}
+                    <code>{b.guideCell.passRule.expectedSubstring}</code>
+                  </>
+                ) : null}
+                {b.guideCell.passRule?.assertCode ? (
+                  <>
+                    ，断言 <code>{b.guideCell.passRule.assertCode}</code>
+                  </>
+                ) : null}
+              </p>
+              <div className="jnb-run-row">
+                <button
+                  type="button"
+                  onClick={() => void runAndVerify("guide", b.guideCell)}
+                  disabled={cellState[b.guideCell.id]?.loading}
+                >
+                  {cellState[b.guideCell.id]?.loading
+                    ? "运行中…"
+                    : "运行并上报"}
+                </button>
+                {cellState[b.guideCell.id]?.lastMsg && (
+                  <span
+                    className={
+                      cellState[b.guideCell.id]?.passed ? "jnb-ok" : "jnb-warn"
+                    }
+                  >
+                    {cellState[b.guideCell.id]?.lastMsg}
+                  </span>
                 )}
               </div>
-            </div>
-            <div className="jnb-code-cell">
-              <span className="jnb-prompt">In [{iExt}]:</span>
-              <div className="jnb-code-col">
-                <textarea
-                  className="jnb-input"
-                  value={getCode("extension", b.extensionCell)}
-                  onChange={(e) => setCode(b.extensionCell.id, e.target.value)}
-                  rows={6}
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-            <div className="jnb-run-row">
-              <button
-                type="button"
-                onClick={() => void runAndVerify("extension", b.extensionCell)}
-                disabled={cellState[b.extensionCell.id]?.loading}
-              >
-                {cellState[b.extensionCell.id]?.loading
-                  ? "运行中…"
-                  : "运行并上报"}
-              </button>
-              {cellState[b.extensionCell.id]?.lastMsg && (
-                <span
-                  className={
-                    cellState[b.extensionCell.id]?.passed ? "jnb-ok" : "jnb-warn"
-                  }
-                >
-                  {cellState[b.extensionCell.id]?.lastMsg}
-                </span>
-              )}
-            </div>
-          </section>
-        );
-      })}
 
-      <div className="sd-complete">
-        <button
-          type="button"
-          onClick={() => void onComplete()}
-          disabled={completing}
-        >
-          {completing ? "…" : "尝试标记本章完成"}
-        </button>
-        {completeMsg && <p className="sd-muted">{completeMsg}</p>}
-        <p className="sd-muted sm">
-          需每个 cell 在服务端记录为通过后才能完成；否则会返回 400。
-        </p>
+              <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
+                扩展
+              </div>
+              <div className="jnb-code-cell">
+                <span className="jnb-prompt jnb-prompt--muted">（说明）</span>
+                <div className="jnb-code-col">
+                  {htmlMd(
+                    b.extensionCell.promptHtml || "<p></p>",
+                    `${b.id}-ex`,
+                  )}
+                </div>
+              </div>
+              <div className="jnb-code-cell">
+                <span className="jnb-prompt">In [{iExt}]:</span>
+                <div className="jnb-code-col">
+                  <textarea
+                    className="jnb-input"
+                    value={getCode("extension", b.extensionCell)}
+                    onChange={(e) => setCode(b.extensionCell.id, e.target.value)}
+                    rows={6}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+              <p className="jnb-pass">
+                过关：模式 <code>{b.extensionCell.passRule?.mode}</code>
+                {b.extensionCell.passRule?.expectedSubstring ? (
+                  <>
+                    ，stdout 须含{" "}
+                    <code>{b.extensionCell.passRule.expectedSubstring}</code>
+                  </>
+                ) : null}
+                {b.extensionCell.passRule?.assertCode ? (
+                  <>
+                    ，断言 <code>{b.extensionCell.passRule.assertCode}</code>
+                  </>
+                ) : null}
+              </p>
+              <div className="jnb-run-row">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void runAndVerify("extension", b.extensionCell)
+                  }
+                  disabled={cellState[b.extensionCell.id]?.loading}
+                >
+                  {cellState[b.extensionCell.id]?.loading
+                    ? "运行中…"
+                    : "运行并上报"}
+                </button>
+                {cellState[b.extensionCell.id]?.lastMsg && (
+                  <span
+                    className={
+                      cellState[b.extensionCell.id]?.passed
+                        ? "jnb-ok"
+                        : "jnb-warn"
+                    }
+                  >
+                    {cellState[b.extensionCell.id]?.lastMsg}
+                  </span>
+                )}
+              </div>
+            </section>
+          );
+        })}
+
+        <div className="jnb-footer-actions">
+          <button
+            type="button"
+            onClick={() => void onComplete()}
+            disabled={completing}
+          >
+            {completing ? "…" : "尝试标记本章完成"}
+          </button>
+          {completeMsg && <p className="jnb-footer-msg">{completeMsg}</p>}
+          <p className="jnb-footer-hint">
+            需每个 cell 在服务端记录为通过后才能完成；否则接口会返回 400。
+          </p>
+        </div>
       </div>
     </div>
   );
