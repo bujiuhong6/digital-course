@@ -51,6 +51,7 @@ async def page_login(
         {
             "need_bootstrap": need_bootstrap,
             "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+            "login_error": None,
         },
     )
 
@@ -70,15 +71,23 @@ async def post_bootstrap(
     if r.scalar_one_or_none() is not None:
         return templates.TemplateResponse(
             request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": "管理员已存在，请直接登录。"},
+            "teacher/login.html",
+            {
+                "need_bootstrap": False,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "管理员已存在，请直接登录。",
+            },
         )
     require_bootstrap_token(bootstrap_token or None)
     if not password or _pwd is None:
         return templates.TemplateResponse(
             request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": "密码无效或环境未装 passlib。"},
+            "teacher/login.html",
+            {
+                "need_bootstrap": True,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "密码无效或环境未装 passlib。",
+            },
         )
     db.add(AdminConfig(id=1, password_hash=_pwd.hash(password)))
     _set_teacher_cookie(response)
@@ -96,11 +105,27 @@ async def post_login(
     if await teacher_cookie_valid(teacher_session, db):
         return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
     row = (await db.execute(select(AdminConfig).where(AdminConfig.id == 1))).scalar_one_or_none()
-    if row is None or _pwd is None or not _pwd.verify(password, row.password_hash):
+    if row is None:
         return templates.TemplateResponse(
             request,
-            "teacher/partials/flash.html",
-            {"level": "error", "message": "密码错误。"},
+            "teacher/login.html",
+            {
+                "need_bootstrap": True,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "尚未创建管理员，请先在下方完成首次设置。",
+            },
+        )
+    if _pwd is None or not _pwd.verify(password, row.password_hash):
+        return templates.TemplateResponse(
+            request,
+            "teacher/login.html",
+            {
+                "need_bootstrap": False,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "密码错误。"
+                if _pwd is not None
+                else "密码校验不可用（请检查 passlib 环境）。",
+            },
         )
     await db.execute(
         update(AdminConfig).where(AdminConfig.id == 1).values(updated_at=func.now())
