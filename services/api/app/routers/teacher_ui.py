@@ -15,6 +15,7 @@ from fastapi import APIRouter, Cookie, File, Form, Query, Request, UploadFile, s
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, update
+from sqlalchemy.orm import selectinload
 
 from ..config import settings
 from ..db.models import (
@@ -412,6 +413,7 @@ async def page_roster(
         return _redirect_login()
     r = await db.execute(
         select(RosterEntry)
+        .options(selectinload(RosterEntry.class_))
         .where(RosterEntry.deleted_at.is_(None))
         .order_by(RosterEntry.student_no)
     )
