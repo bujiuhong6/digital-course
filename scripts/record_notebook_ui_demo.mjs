@@ -50,7 +50,7 @@ async function main() {
   await p2.getByLabel("学号", { exact: true }).fill(STU.no);
   await p2.getByLabel("密码", { exact: true }).fill(STU.pw);
   await p2.getByRole("button", { name: "进入" }).click();
-  await p2.getByText("章节练习列表").waitFor({ timeout: 15_000 });
+  await p2.getByText("已发布章节练习").waitFor({ timeout: 15_000 });
   const demoBtn = p2
     .getByRole("button", { name: /演示章/ })
     .or(p2.getByText("演示章", { exact: false }));

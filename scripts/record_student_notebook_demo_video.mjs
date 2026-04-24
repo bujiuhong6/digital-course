@@ -21,7 +21,7 @@ async function main() {
   await page.getByLabel("密码", { exact: true }).fill("E2EPass123");
   await pause(500);
   await page.getByRole("button", { name: "进入" }).click();
-  await page.getByText("章节练习列表", { exact: true }).waitFor();
+  await page.getByText("已发布章节练习", { exact: true }).waitFor();
   await pause(1200);
   await page.getByText(/E2E 演示/).first().click();
   await page.locator("textarea.jnb-input").first().waitFor();

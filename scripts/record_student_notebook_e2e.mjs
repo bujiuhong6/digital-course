@@ -24,7 +24,7 @@ async function main() {
   await page.getByLabel("学号", { exact: true }).fill("E2E0001");
   await page.getByLabel("密码", { exact: true }).fill("E2EPass123");
   await page.getByRole("button", { name: "进入" }).click();
-  await page.getByText("章节练习列表", { exact: true }).waitFor();
+  await page.getByText("已发布章节练习", { exact: true }).waitFor();
   const openChapter = page
     .getByRole("button", { name: /E2E 演示/ })
     .or(page.getByText(/E2E 演示/));
