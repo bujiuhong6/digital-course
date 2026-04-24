@@ -57,6 +57,18 @@ class GuideCell(BaseModel):
     starter_code: str = Field(min_length=1, alias="starterCode")
     description: str = Field(min_length=1, max_length=16_000)
     pass_rule: PassRule = Field(alias="passRule")
+    exercise_title: str | None = Field(
+        default=None,
+        max_length=500,
+        alias="exerciseTitle",
+        description="习题短标题，学生端以三级标题显示",
+    )
+    expected_output: str | None = Field(
+        default=None,
+        max_length=8_000,
+        alias="expectedOutput",
+        description="本题期望输出/结果说明，学生端在代码区前展示",
+    )
     reference_answer: str | None = Field(
         default=None,
         max_length=32_000,
@@ -74,6 +86,16 @@ class ExtensionCell(BaseModel):
         default=None, max_length=1_000_000, alias="starterCode"
     )
     pass_rule: PassRule = Field(alias="passRule")
+    exercise_title: str | None = Field(
+        default=None,
+        max_length=500,
+        alias="exerciseTitle",
+    )
+    expected_output: str | None = Field(
+        default=None,
+        max_length=8_000,
+        alias="expectedOutput",
+    )
     reference_answer: str | None = Field(
         default=None,
         max_length=32_000,
@@ -86,6 +108,12 @@ class ContentBlock(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(min_length=1, max_length=128, description="本块稳定 id，可用 blk- 前缀 + uuid")
+    section_title: str | None = Field(
+        default=None,
+        max_length=500,
+        alias="sectionTitle",
+        description="本块对应知识点二级标题；缺省为「知识点 n」",
+    )
     knowledge_html: str = Field(
         min_length=0, max_length=500_000, alias="knowledgeHtml"
     )
@@ -100,6 +128,12 @@ class PublishedContentV1(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     version: Literal[1] = 1
+    chapter_intro_html: str = Field(
+        default="",
+        max_length=500_000,
+        alias="chapterIntroHtml",
+        description="章首主要知识点介绍（在章节名下方、各知识点块之前）",
+    )
     blocks: list[ContentBlock] = Field(min_length=1)
 
 
@@ -201,21 +235,27 @@ def sample_published_v1() -> dict[str, Any]:
     bid = f"blk-{uuid4()}"
     return {
         "version": 1,
+        "chapterIntroHtml": "<p>本章为占位示例。下方按知识点分块，含基础与扩展题。</p>",
         "blocks": [
             {
                 "id": bid,
-                "knowledgeHtml": "<p>Sample</p>",
+                "sectionTitle": "知识点示例",
+                "knowledgeHtml": "<p>print 能向标准输出写文本，便于对照过关条件。</p>",
                 "requiredExecutionMode": "pyodide",
                 "guideCell": {
                     "id": "c1",
                     "starterCode": "print('hi')",
-                    "description": "Run once",
+                    "description": "<p>运行一段代码，无异常即通过</p>",
+                    "exerciseTitle": "第 1 题（基础）",
+                    "expectedOutput": "终端出现 hi 等输出即可（no_exception 模式）",
                     "passRule": {"mode": "no_exception"},
                 },
                 "extensionCell": {
                     "id": "c2",
-                    "promptHtml": "<p>Print greeting</p>",
+                    "promptHtml": "<p>打印含 Hello 的一行</p>",
                     "starterCode": None,
+                    "exerciseTitle": "第 1 题（扩展）",
+                    "expectedOutput": "含 Hello 子串的 stdout 一行",
                     "passRule": {
                         "mode": "stdout_contains",
                         "expectedSubstring": "Hello",

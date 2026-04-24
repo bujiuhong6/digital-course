@@ -18,6 +18,8 @@ type GuideCell = {
   starterCode: string;
   description: string;
   passRule: PassRule;
+  exerciseTitle?: string | null;
+  expectedOutput?: string | null;
   referenceAnswer?: string | null;
 };
 
@@ -26,18 +28,25 @@ type ExtensionCell = {
   promptHtml: string;
   starterCode: string | null;
   passRule: PassRule;
+  exerciseTitle?: string | null;
+  expectedOutput?: string | null;
   referenceAnswer?: string | null;
 };
 
 type Block = {
   id: string;
+  sectionTitle?: string | null;
   knowledgeHtml: string;
   requiredExecutionMode?: string | null;
   guideCell: GuideCell;
   extensionCell: ExtensionCell;
 };
 
-type PublishedV1 = { version: 1; blocks: Block[] };
+type PublishedV1 = {
+  version: 1;
+  chapterIntroHtml?: string;
+  blocks: Block[];
+};
 
 function isPublishedV1(x: unknown): x is PublishedV1 {
   if (!x || typeof x !== "object") {
@@ -85,7 +94,9 @@ function htmlMd(html: string, key: string) {
 function formatRunForDisplay(r: RunResult): string {
   if (!r.runOk) {
     const parts: string[] = [];
-    if (r.errorExcerpt) {
+    if (r.fullError) {
+      parts.push(r.fullError);
+    } else if (r.errorExcerpt) {
       parts.push(r.errorExcerpt);
     }
     if (r.stderr) {
@@ -108,15 +119,51 @@ function runOutputIsSyntaxStyle(run: RunResult | null | undefined): boolean {
   return Boolean(run) && !run!.runOk;
 }
 
+/** 在状态未及时写入 feedbackKind 时，从 run + passed 回退派生 */
+function effectiveFeedback(
+  s: CellState | undefined,
+): { kind: FeedbackKind; showMsg: boolean } {
+  if (!s) {
+    return { kind: "idle", showMsg: false };
+  }
+  if (s.feedbackKind === "network" && s.lastMsg) {
+    return { kind: "network", showMsg: true };
+  }
+  if (s.feedbackKind === "network") {
+    return { kind: "network", showMsg: false };
+  }
+  if (s.feedbackKind !== "idle") {
+    return { kind: s.feedbackKind, showMsg: true };
+  }
+  if (!s.lastRun) {
+    return { kind: "idle", showMsg: false };
+  }
+  if (!s.lastRun.runOk) {
+    return { kind: "syntax_error", showMsg: true };
+  }
+  if (s.passed === true) {
+    return { kind: "pass", showMsg: true };
+  }
+  if (s.passed === false) {
+    return { kind: "logic_fail", showMsg: true };
+  }
+  return { kind: "idle", showMsg: false };
+}
+
 function MessageBar({
   kind,
+  showMsg,
   passedServer,
   text,
 }: {
   kind: FeedbackKind;
+  showMsg: boolean;
   passedServer: boolean | null;
   text: string | null;
 }) {
+  if (!showMsg) {
+    return null;
+  }
   if (kind === "network" && text) {
     return (
       <div className="jnb-msg jnb-msg--err" role="alert">
@@ -155,7 +202,12 @@ function MessageBar({
 
 function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
   if (!run) {
-    return null;
+    return (
+      <div className="jnb-out jnb-out--empty">
+        <div className="jnb-out-label">运行结果</div>
+        <p className="jnb-out-empty">运行后在此显示标准输出或 Python 报错。</p>
+      </div>
+    );
   }
   const bad = runOutputIsSyntaxStyle(run);
   return (
@@ -287,6 +339,7 @@ function ChapterPracticeInner({
             stderr: "",
             runOk: false,
             errorExcerpt: err,
+            fullError: err,
             elapsedMs: 0,
           },
           feedbackKind: "network",
@@ -378,12 +431,10 @@ function ChapterPracticeInner({
         className="jnb-page"
         style={{ border: "none", margin: 0, maxWidth: "none" }}
       >
-        <h2 className="jnb-hero-title">{title}</h2>
-        <p className="jnb-hero-lead">
-          Notebook
-          式练习（内嵌 Pyodide，与 design
-          文档一致；运行环境在浏览器中，为教学用途的轻量实现）。
-        </p>
+        <h1 className="jnb-chapter-h1">{title}</h1>
+        {data.chapterIntroHtml
+          ? htmlMd(data.chapterIntroHtml, "chapter-intro")
+          : null}
         <div className="jnb-py-box" role="status">
           {pyStatus === "idle" && (
             <>
@@ -409,39 +460,36 @@ function ChapterPracticeInner({
           )}
         </div>
         {data.blocks.map((b, bi) => {
-          const i0 = bi * 3 + 1;
-          const iGuide = i0 + 1;
-          const iExt = i0 + 2;
+          const sec = b.sectionTitle?.trim() || `知识点 ${bi + 1}`;
+          const gTitle =
+            b.guideCell.exerciseTitle?.trim() || "第 1 题（基础）";
+          const eTitle =
+            b.extensionCell.exerciseTitle?.trim() || "第 1 题（扩展）";
           return (
-            <section key={b.id} className="jnb-section">
-              <div className="jnb-sec-h">
-                第 <strong>{bi + 1}</strong> 块
-              </div>
-              {b.requiredExecutionMode && (
-                <p
-                  className="jnb-hint"
-                  style={{ paddingLeft: 0, marginTop: 0 }}
-                >
-                  本章要求执行模式：<code>{b.requiredExecutionMode}</code>
+            <div key={b.id} className="jnb-kp">
+              <h2 className="jnb-h2">{sec}</h2>
+              {b.knowledgeHtml
+                ? htmlMd(b.knowledgeHtml, `${b.id}-kp`)
+                : null}
+              {b.requiredExecutionMode ? (
+                <p className="jnb-hint" style={{ paddingLeft: 0, margin: "0.35rem 0" }}>
+                  执行环境：<code>{b.requiredExecutionMode}</code>
                 </p>
-              )}
-              <div className="jnb-code-cell">
-                <span className="jnb-prompt">In [{i0}]:</span>
-                <div className="jnb-code-col">
-                  {htmlMd(b.knowledgeHtml || "<p></p>", `${b.id}-kn`)}
-                </div>
-              </div>
+              ) : null}
 
-              <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
-                引导
-              </div>
-              {b.guideCell.description && (
-                <p className="jnb-cell-desc" style={{ marginTop: 0 }}>
-                  {b.guideCell.description}
-                </p>
-              )}
-              <div className="jnb-code-cell">
-                <span className="jnb-prompt">In [{iGuide}]:</span>
+              <h3 className="jnb-h3">基础练习</h3>
+              <h4 className="jnb-h4">{gTitle}</h4>
+              {htmlMd(b.guideCell.description, `${b.id}-gdesc`)}
+              {b.guideCell.expectedOutput ? (
+                <div className="jnb-expected">
+                  <div className="jnb-expected-h">题目期望的输出或结果</div>
+                  <div className="jnb-expected-body">
+                    {b.guideCell.expectedOutput}
+                  </div>
+                </div>
+              ) : null}
+              <div className="jnb-code-row">
+                <span className="jnb-prompt jnb-prompt--code">代码</span>
                 <div className="jnb-code-col">
                   <textarea
                     className="jnb-input"
@@ -467,7 +515,7 @@ function ChapterPracticeInner({
                   </>
                 ) : null}
               </p>
-              <div className="jnb-run-row">
+              <div className="jnb-run-row jnb-run-row--top">
                 <button
                   type="button"
                   onClick={() => void runAndVerify("guide", b.guideCell)}
@@ -478,33 +526,36 @@ function ChapterPracticeInner({
                     : "运行并上报"}
                 </button>
               </div>
+              {cellState[b.guideCell.id]?.loading &&
+              !cellState[b.guideCell.id]?.lastRun ? (
+                <p className="jnb-pending">正在执行代码并上报结果…</p>
+              ) : null}
               <RunOutputBlock run={cellState[b.guideCell.id]?.lastRun} />
               <MessageBar
-                kind={cellState[b.guideCell.id]?.feedbackKind ?? "idle"}
+                {...effectiveFeedback(cellState[b.guideCell.id])}
                 passedServer={cellState[b.guideCell.id]?.passed ?? null}
                 text={cellState[b.guideCell.id]?.lastMsg}
               />
               {b.guideCell.referenceAnswer ? (
                 <div className="jnb-ref">
-                  <div className="jnb-ref-h">标准答案参考（教师设置）</div>
+                  <div className="jnb-ref-h">标准答案参考</div>
                   <pre className="jnb-ref-pre">{b.guideCell.referenceAnswer}</pre>
                 </div>
               ) : null}
 
-              <div className="jnb-label" style={{ marginTop: "0.75rem" }}>
-                扩展
-              </div>
-              <div className="jnb-code-cell">
-                <span className="jnb-prompt jnb-prompt--muted">（说明）</span>
-                <div className="jnb-code-col">
-                  {htmlMd(
-                    b.extensionCell.promptHtml || "<p></p>",
-                    `${b.id}-ex`,
-                  )}
+              <h3 className="jnb-h3 jnb-h3--ext">扩展练习</h3>
+              <h4 className="jnb-h4">{eTitle}</h4>
+              {htmlMd(b.extensionCell.promptHtml || "<p></p>", `${b.id}-exq`)}
+              {b.extensionCell.expectedOutput ? (
+                <div className="jnb-expected">
+                  <div className="jnb-expected-h">题目期望的输出或结果</div>
+                  <div className="jnb-expected-body">
+                    {b.extensionCell.expectedOutput}
+                  </div>
                 </div>
-              </div>
-              <div className="jnb-code-cell">
-                <span className="jnb-prompt">In [{iExt}]:</span>
+              ) : null}
+              <div className="jnb-code-row">
+                <span className="jnb-prompt jnb-prompt--code">代码</span>
                 <div className="jnb-code-col">
                   <textarea
                     className="jnb-input"
@@ -530,7 +581,7 @@ function ChapterPracticeInner({
                   </>
                 ) : null}
               </p>
-              <div className="jnb-run-row">
+              <div className="jnb-run-row jnb-run-row--top">
                 <button
                   type="button"
                   onClick={() =>
@@ -543,19 +594,25 @@ function ChapterPracticeInner({
                     : "运行并上报"}
                 </button>
               </div>
+              {cellState[b.extensionCell.id]?.loading &&
+              !cellState[b.extensionCell.id]?.lastRun ? (
+                <p className="jnb-pending">正在执行代码并上报结果…</p>
+              ) : null}
               <RunOutputBlock run={cellState[b.extensionCell.id]?.lastRun} />
               <MessageBar
-                kind={cellState[b.extensionCell.id]?.feedbackKind ?? "idle"}
+                {...effectiveFeedback(cellState[b.extensionCell.id])}
                 passedServer={cellState[b.extensionCell.id]?.passed ?? null}
                 text={cellState[b.extensionCell.id]?.lastMsg}
               />
               {b.extensionCell.referenceAnswer ? (
                 <div className="jnb-ref">
-                  <div className="jnb-ref-h">标准答案参考（教师设置）</div>
-                  <pre className="jnb-ref-pre">{b.extensionCell.referenceAnswer}</pre>
+                  <div className="jnb-ref-h">标准答案参考</div>
+                  <pre className="jnb-ref-pre">
+                    {b.extensionCell.referenceAnswer}
+                  </pre>
                 </div>
               ) : null}
-            </section>
+            </div>
           );
         })}
 

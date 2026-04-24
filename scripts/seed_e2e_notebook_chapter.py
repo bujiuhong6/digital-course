@@ -51,15 +51,29 @@ _STU_PW = "E2EPass123"
 def published_content() -> dict:
     return {
         "version": 1,
+        "chapterIntroHtml": (
+            "<p>本演示章介绍 <strong>标准输出</strong> 与过关条件。</p>"
+            "<p>下方按知识点分块：基础练与扩展练各一题；"
+            "顺序为题目说明 → 期望输出 → 代码区 → 运行结果与判题提示。</p>"
+        ),
         "blocks": [
             {
                 "id": "blk-e2e-1",
-                "knowledgeHtml": "<p>在下方输入框中编辑代码，点「运行并上报」。引导关要求标准输出含 <code>ok</code>；扩展关要求含 <code>Hello</code>。</p>",
+                "sectionTitle": "认识 print 与 stdout",
+                "knowledgeHtml": (
+                    "<p>函数 <code>print(...)</code> 会把内容写到标准输出。"
+                    "本题要求运行后，标准输出中含有指定子串才算通过。</p>"
+                ),
                 "requiredExecutionMode": "pyodide",
                 "guideCell": {
                     "id": "c-guide-e2e",
+                    "exerciseTitle": "第 1 题（基础）：输出含 ok",
                     "starterCode": 'print("改这里，先故意写错再改对")',
-                    "description": "引导：stdout 须包含子串 ok",
+                    "description": (
+                        "<p>编辑代码后点「运行并上报」。"
+                        "过关条件：标准输出中须包含子串 <code>ok</code>。</p>"
+                    ),
+                    "expectedOutput": "含字母 ok 的一行或若干行，例如：ok 或 all ok",
                     "referenceAnswer": 'print("ok")',
                     "passRule": {
                         "mode": "stdout_contains",
@@ -68,8 +82,13 @@ def published_content() -> dict:
                 },
                 "extensionCell": {
                     "id": "c-ext-e2e",
-                    "promptHtml": "<p>扩展：打印一行含 Hello 的问候。</p>",
+                    "exerciseTitle": "第 1 题（扩展）：问候中含 Hello",
+                    "promptHtml": (
+                        "<p>打印一行内容，<strong>必须包含</strong>子串 <code>Hello</code> "
+                        "（可含其他字符）。</p>"
+                    ),
                     "starterCode": 'print("先写错再改")',
+                    "expectedOutput": "例如：Hello, world! 或 Hello 任意后缀",
                     "referenceAnswer": 'print("Hello!")',
                     "passRule": {
                         "mode": "stdout_contains",
@@ -82,15 +101,17 @@ def published_content() -> dict:
 
 
 def _resolve_sqlite_path(url: str) -> str:
-    """`sqlite+aiosqlite:///../file` 或 `...:///./data/x.db` → 绝对路径。"""
+    """相对路径以 `services/api` 为基准，与 `cd services/api && uvicorn` 一致。"""
     prefix = "sqlite+aiosqlite:///"
     if not url.startswith(prefix):
         raise ValueError("need sqlite+aiosqlite url")
     p = url.removeprefix(prefix).split("?")[0]
+    if p.startswith("//"):
+        return p[1:]
     path = Path(p)
-    if not path.is_absolute():
-        path = (Path.cwd() / path).resolve()
-    return str(path)
+    if path.is_absolute():
+        return str(path)
+    return str((_API / path).resolve())
 
 
 async def main() -> None:

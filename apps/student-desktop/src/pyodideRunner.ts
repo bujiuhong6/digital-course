@@ -13,6 +13,8 @@ export type RunResult = {
   stderr: string;
   runOk: boolean;
   errorExcerpt: string | null;
+  /** 完整异常信息，供学生端「运行结果」区展示（不截断） */
+  fullError: string | null;
   elapsedMs: number;
 };
 
@@ -144,7 +146,14 @@ export async function runPythonInPyodide(code: string): Promise<RunResult> {
   try {
     await py.runPythonAsync(code);
     const elapsedMs = Math.max(0, Math.round(performance.now() - t0));
-    return { stdout, stderr, runOk: true, errorExcerpt: null, elapsedMs };
+    return {
+      stdout,
+      stderr,
+      runOk: true,
+      errorExcerpt: null,
+      fullError: null,
+      elapsedMs,
+    };
   } catch (e) {
     const elapsedMs = Math.max(0, Math.round(performance.now() - t0));
     const msg = e instanceof Error ? e.message : String(e);
@@ -153,6 +162,7 @@ export async function runPythonInPyodide(code: string): Promise<RunResult> {
       stderr,
       runOk: false,
       errorExcerpt: msg.length > 500 ? msg.slice(0, 500) : msg,
+      fullError: msg,
       elapsedMs,
     };
   }
