@@ -1,5 +1,8 @@
 {% extends "teacher/base.html" %}
 {% block title %}{{ ch.title }}{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+{% endblock %}
 {% block body %}
 <div class="bar">
   <h1 style="margin:0">{{ ch.title }} <small style="color:var(--muted)"><code>{{ ch.slug }}</code></small></h1>
