@@ -232,6 +232,105 @@ async def page_classes(
     )
 
 
+@router.get("/classes/{class_id}", response_class=HTMLResponse)
+async def page_class_detail(
+    request: Request,
+    db: DBSession,
+    class_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+    cl = r.scalar_one_or_none()
+    if cl is None:
+        return HTMLResponse("班级不存在", status_code=404)
+    r_flash: str | None = None
+    r_level: str | None = None
+    if request.query_params.get("saved") == "1":
+        r_level, r_flash = "ok", "已更新班级。"
+    r_roster = await db.execute(
+        select(RosterEntry)
+        .options(selectinload(RosterEntry.class_))
+        .where(
+            RosterEntry.deleted_at.is_(None),
+            RosterEntry.class_id == class_id,
+        )
+        .order_by(RosterEntry.student_no)
+    )
+    roster_rows = r_roster.scalars().all()
+    r_stu = await db.execute(
+        select(Student, ClassModel)
+        .outerjoin(ClassModel, Student.class_id == ClassModel.id)
+        .where(Student.class_id == class_id)
+        .order_by(Student.student_no)
+    )
+    reg_students = r_stu.all()
+    r_cls = await db.execute(
+        select(ClassModel).order_by(ClassModel.name)
+    )
+    all_classes = r_cls.scalars().all()
+    return templates.TemplateResponse(
+        request,
+        "teacher/class_detail.html",
+        {
+            "cl": cl,
+            "roster_rows": roster_rows,
+            "reg_students": reg_students,
+            "all_classes": all_classes,
+            "roster_flash": r_flash,
+            "roster_flash_level": r_level,
+        },
+    )
+
+
+@router.get("/classes/{class_id}/completions-export")
+async def export_class_chapter_completions_csv(
+    db: DBSession,
+    class_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """本班学生 × 全章：有完成记录时一行；便于批量查看练习提交情况。UTF-8 BOM。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+    cl = r.scalar_one_or_none()
+    if cl is None:
+        return HTMLResponse("班级不存在", status_code=404)
+    r2 = await db.execute(
+        select(Chapter, ChapterCompletion, Student)
+        .join(ChapterCompletion, ChapterCompletion.chapter_id == Chapter.id)
+        .join(Student, Student.id == ChapterCompletion.student_id)
+        .where(Chapter.content_status == "published", Student.class_id == class_id)
+        .order_by(Chapter.order, Chapter.title, Student.student_no)
+    )
+    rows = r2.all()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        ["chapterTitle", "chapterSlug", "studentNo", "fullName", "completedAtUtc"],
+    )
+    for ch, cc, st in rows:
+        w.writerow(
+            [
+                ch.title,
+                ch.slug,
+                st.student_no,
+                st.full_name,
+                cc.completed_at.strftime("%Y-%m-%d %H:%M:%S"),
+            ]
+        )
+    body = "\ufeff" + buf.getvalue()
+    safe = quote((cl.name or "class")[:40], safe="")
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="class-{safe}-completions.csv"',
+        },
+    )
+
+
 @router.post("/classes/new", response_class=HTMLResponse)
 async def ui_class_new(
     request: Request,
@@ -267,6 +366,8 @@ async def ui_set_student_class(
     db: DBSession,
     student_id: uuid.UUID,
     class_id: str = Form(""),
+    return_to: str = Form("roster"),
+    return_class_id: str = Form(""),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
     if not await teacher_cookie_valid(teacher_session, db):
@@ -287,7 +388,23 @@ async def ui_set_student_class(
         if c is None:
             return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
         st.class_id = c.id
-    return RedirectResponse(url="/teacher/roster?saved=1", status_code=303)
+    if (return_to or "").strip() == "class":
+        target: uuid.UUID | None = st.class_id
+        raw = (return_class_id or "").strip()
+        if raw:
+            try:
+                target = uuid.UUID(raw)
+            except ValueError:
+                pass
+        if target is not None:
+            return RedirectResponse(
+                url=f"/teacher/classes/{target}?saved=1",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+    return RedirectResponse(
+        url="/teacher/roster?saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @router.get("/chapters/{chapter_id}/completions", response_class=HTMLResponse)
