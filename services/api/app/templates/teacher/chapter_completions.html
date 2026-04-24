@@ -12,7 +12,11 @@
 
 <div class="card">
   <h2 style="margin-top:0">学生提交（标记本章完成）</h2>
+  <p style="margin:0 0 0.75rem"><strong>已提交人数：</strong> {{ submit_count }}</p>
   <p style="color:var(--muted);font-size:0.9rem">仅当学生在本章所有必做 cell 服务端记录为「通过」后，才能标记完成；下列时间为学生点击「尝试标记本章完成」成功的时间。</p>
+  <p style="margin:0.5rem 0 1rem">
+    <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/completions/export">导出 CSV（学号、姓名）</a>
+  </p>
   {% if not completions %}
   <p>暂无记录。</p>
   {% else %}
