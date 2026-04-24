@@ -10,5 +10,5 @@
 - **准备清单**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md)  
 - **设计规格**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md)  
 - **实现计划**（`writing-plans`）：[`docs/superpowers/plans/2026-04-23-ai-python-teaching-system-implementation.md`](docs/superpowers/plans/2026-04-23-ai-python-teaching-system-implementation.md) — 与清单、设计一致。  
-- **API 骨架**（**任务 1 已完成**）：`services/api/`。本地：进入该目录后 `python3 -m venv .venv && . .venv/bin/activate && pip install -e . && uvicorn app.main:app --reload`；`GET /health` 应返回 `{"ok":true}`。生产镜像见 `services/api/Dockerfile` 与根目录 `docker-compose.yml`。
+- **API 服务**：`services/api/`。更完整的本地命令、**硅基流动等 LLM 环境变量**见 [`services/api/README.md`](services/api/README.md)。生产镜像见 `services/api/Dockerfile` 与根目录 `docker-compose.yml`。
 - **学生桌面（任务 11）**：`apps/student-desktop/`（Tauri + React + Vite，环境变量 `VITE_API_BASE_URL`）。说明见该目录下 `README.md`。

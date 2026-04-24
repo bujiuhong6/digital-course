@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from ..config import settings
+from ..config import normalize_openai_compat_base_url, settings
 from ..db.models import Chapter
 from ..deps import CurrentStudent, DBSession
 from ..services.chat_limiter import check_and_record_request
@@ -115,7 +115,9 @@ async def student_chat(
             detail=reason,
         )
 
-    base = (settings.chat_llm_base_url or settings.llm_base_url or "").strip().rstrip("/")
+    base = normalize_openai_compat_base_url(
+        settings.chat_llm_base_url or settings.llm_base_url
+    )
     if not base:
         # 开发/测试：不调用外网
         payload = {

@@ -1,8 +1,23 @@
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 32 字节全零的 base64，仅作本地/脚手架默认；生产环境务必用 `STUDENT_PASSWORD_KEY` 覆盖。
 _DEFAULT_STUDENT_PASSWORD_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+
+def normalize_openai_compat_base_url(url: str) -> str:
+    """
+    章生成与聊天均拼接 `{base}/v1/chat/completions`；若把官方示例里的
+    `.../v1` 写进 `LLM_BASE_URL`，会重复为 `/v1/v1/...`。
+    这里去掉尾部的 `/v1` 与尾斜杠；空串保持空。
+    """
+    s = (url or "").strip()
+    if not s:
+        return ""
+    s = s.rstrip("/")
+    if s.lower().endswith("/v1"):
+        s = s[:-3].rstrip("/")
+    return s
 
 
 class Settings(BaseSettings):
@@ -60,6 +75,13 @@ class Settings(BaseSettings):
         default=0,
         description="0 表示不限制。",
     )
+
+    @field_validator("llm_base_url", "chat_llm_base_url", mode="before")
+    @classmethod
+    def _normalize_openai_base_urls(cls, v: object) -> object:
+        if v is None or not isinstance(v, str):
+            return v
+        return normalize_openai_compat_base_url(v)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
