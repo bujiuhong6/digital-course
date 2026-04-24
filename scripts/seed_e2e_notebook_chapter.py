@@ -70,7 +70,7 @@ def published_content() -> dict:
                     "exerciseTitle": "第 1 题（基础）：输出含 ok",
                     "starterCode": 'print("改这里，先故意写错再改对")',
                     "description": (
-                        "<p>编辑代码后点「运行并上报」。"
+                        "<p>编辑代码后点「执行」。"
                         "过关条件：标准输出中须包含子串 <code>ok</code>。</p>"
                     ),
                     "expectedOutput": "含字母 ok 的一行或若干行，例如：ok 或 all ok",

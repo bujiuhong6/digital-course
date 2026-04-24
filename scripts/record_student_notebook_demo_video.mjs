@@ -34,7 +34,7 @@ async function main() {
   await guide.clear();
   await guide.fill("print('wrong')");
   await pause(600);
-  await page.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await page.getByRole("button", { name: "执行" }).nth(0).click();
   await page.getByText("未通过", { exact: false }).first().waitFor({
     timeout: 120_000,
   });
@@ -43,7 +43,7 @@ async function main() {
   await guide.clear();
   await guide.fill('print("all ok now")');
   await pause(500);
-  await page.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await page.getByRole("button", { name: "执行" }).nth(0).click();
   await page.getByText("本关已记录为通过", { exact: false }).first().waitFor({
     timeout: 120_000,
   });
@@ -52,7 +52,7 @@ async function main() {
   await ext.clear();
   await ext.fill("print('bye')");
   await pause(500);
-  await page.getByRole("button", { name: "运行并上报" }).nth(1).click();
+  await page.getByRole("button", { name: "执行" }).nth(1).click();
   await page.getByText("未通过", { exact: false }).first().waitFor({
     timeout: 120_000,
   });
@@ -61,7 +61,7 @@ async function main() {
   await ext.clear();
   await ext.fill('print("Hello, world!")');
   await pause(500);
-  await page.getByRole("button", { name: "运行并上报" }).nth(1).click();
+  await page.getByRole("button", { name: "执行" }).nth(1).click();
   await page.waitForFunction(
     () => (document.body.innerText.match(/本关已记录为通过/g) || []).length >= 2,
     { timeout: 120_000 },

@@ -7,7 +7,7 @@
 import { chromium } from "playwright";
 
 const BASE = "http://127.0.0.1:4173";
-const runBtn = { name: "运行并上报" };
+const runBtn = { name: "执行" };
 const completeBtn = { name: "尝试标记本章完成" };
 
 async function main() {
