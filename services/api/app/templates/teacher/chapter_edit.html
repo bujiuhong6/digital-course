@@ -1,6 +1,7 @@
 {% extends "teacher/base.html" %}
 {% block title %}{{ ch.title }}{% endblock %}
 {% block head %}
+<link rel="stylesheet" href="/static/jupyter-cells.css" />
 <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
 {% endblock %}
 {% block body %}
@@ -78,40 +79,52 @@
 
 {% if published_json and ch.published_content and ch.published_content.get('version') == 1 and ch.published_content.get('blocks') %}
 <div class="card">
-  <h2 style="margin-top:0">发布预览（与学生端章练习同结构，只读）</h2>
-  <p>下方布局与学生桌面里本章练习页一致；代码在浏览器内由学生运行（Pyodide），此处不执行。要修改呈现请改草稿后重新发布。</p>
-  <div class="nb-wrap">
+  <h2 style="margin-top:0">发布预览（Notebook 式，与学生端同结构，只读）</h2>
+  <p>与 design 学生端 Pyodide 练习一致；此处不执行代码。要改内容请调草稿后重新发布。</p>
+  <div class="teacher-jnb">
     {% for b in ch.published_content['blocks'] %}
-    <div class="nb-block">
+    {% set bi = loop.index0 %}
+    {% set i0 = bi * 3 + 1 %}
+    {% set iGuide = i0 + 1 %}
+    {% set iExt = i0 + 2 %}
+    <div class="jnb-surface">
+      <div class="jnb-block-title">第 {{ loop.index }} 块</div>
       {% if b.get('requiredExecutionMode') %}
-      <p class="nb-mode">要求运行环境：{{ b['requiredExecutionMode'] }}</p>
+      <p class="jnb-hint" style="padding-left:0;margin-top:0">要求运行环境：{{ b['requiredExecutionMode'] }}</p>
       {% endif %}
-      <h3>知识</h3>
-      <div class="nb-prose">{{ b.get('knowledgeHtml', '')|safe }}</div>
+      <div class="jnb-code-cell">
+        <span class="jnb-prompt">In [{{ i0 }}]:</span>
+        <div class="jnb-code-col"><div class="jnb-md-cell">{{ b.get('knowledgeHtml', '')|safe }}</div></div>
+      </div>
       {% set g = b.get('guideCell') %}
       {% if g %}
-      <h3>引导</h3>
-      <p class="nb-hint">{{ g.get('description', '') }}</p>
-      <pre class="nb-code-ro">{{ g.get('starterCode', '') }}</pre>
+      <div class="jnb-block-title" style="margin-top:0.75rem">引导</div>
+      {% if g.get('description') %}<p class="jnb-hint" style="padding-left:0">{{ g.get('description', '') }}</p>{% endif %}
+      <div class="jnb-code-cell">
+        <span class="jnb-prompt">In [{{ iGuide }}]:</span>
+        <div class="jnb-code-col"><pre class="jnb-input-ro">{{ g.get('starterCode', '') }}</pre></div>
+      </div>
       {% set gpr = g.get('passRule') or {} %}
-      <p class="nb-hint">过关：模式 <code>{{ gpr.get('mode', '') }}</code>
-        {% if gpr.get('expectedSubstring') %}，stdout 须含 <code>{{ gpr.get('expectedSubstring') }}</code>{% endif %}
-        {% if gpr.get('assertCode') %}，断言 <code>{{ gpr.get('assertCode', '')[:200] }}{% if (gpr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
+      <p class="jnb-hint" style="padding-left:5.5rem">过关：模式 <code style="color:#9ca3af">{{ gpr.get('mode', '') }}</code>
+        {% if gpr.get('expectedSubstring') %}，stdout 须含 <code style="color:#9ca3af">{{ gpr.get('expectedSubstring') }}</code>{% endif %}
+        {% if gpr.get('assertCode') %}，断言 <code style="color:#9ca3af">{{ gpr.get('assertCode', '')[:200] }}{% if (gpr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
       </p>
       {% endif %}
       {% set ex = b.get('extensionCell') %}
       {% if ex %}
-      <h3>扩展</h3>
-      <div class="nb-prose">{{ (ex.get('promptHtml') or '')|safe }}</div>
-      {% if ex.get('starterCode') %}
-      <pre class="nb-code-ro">{{ ex.get('starterCode') }}</pre>
-      {% else %}
-      <p class="nb-hint">（扩展题无起始代码，由学生自写）</p>
-      {% endif %}
+      <div class="jnb-block-title" style="margin-top:0.75rem">扩展</div>
+      <div class="jnb-code-cell">
+        <span class="jnb-prompt">（说明）</span>
+        <div class="jnb-code-col"><div class="jnb-md-cell">{{ (ex.get('promptHtml') or '')|safe }}</div></div>
+      </div>
+      <div class="jnb-code-cell">
+        <span class="jnb-prompt">In [{{ iExt }}]:</span>
+        <div class="jnb-code-col">{% if ex.get('starterCode') %}<pre class="jnb-input-ro">{{ ex.get('starterCode') }}</pre>{% else %}<p class="jnb-hint" style="padding-left:0">（无起始代码，由学生自写）</p>{% endif %}</div>
+      </div>
       {% set epr = ex.get('passRule') or {} %}
-      <p class="nb-hint">过关：模式 <code>{{ epr.get('mode', '') }}</code>
-        {% if epr.get('expectedSubstring') %}，stdout 须含 <code>{{ epr.get('expectedSubstring') }}</code>{% endif %}
-        {% if epr.get('assertCode') %}，断言 <code>{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
+      <p class="jnb-hint" style="padding-left:5.5rem">过关：模式 <code style="color:#9ca3af">{{ epr.get('mode', '') }}</code>
+        {% if epr.get('expectedSubstring') %}，stdout 须含 <code style="color:#9ca3af">{{ epr.get('expectedSubstring') }}</code>{% endif %}
+        {% if epr.get('assertCode') %}，断言 <code style="color:#9ca3af">{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
       </p>
       {% endif %}
     </div>
