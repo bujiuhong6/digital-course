@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, apiJson, clearToken, getToken, setToken } from "./api";
+import { ChapterPractice } from "./ChapterPractice";
 import "./App.css";
 
 type Screen = "login" | "chapters" | "chapter";
@@ -95,16 +96,8 @@ function App() {
     }
   }
 
-  const iframeSrcDoc =
-    selected &&
-    `<!DOCTYPE html><html lang="zh-Hans"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
-<body style="margin:0;font-family:system-ui,sans-serif;padding:1rem;background:#0b1220;color:#e2e8f0">
-<h2 style="margin:0 0 0.5rem">${selected.title.replace(/</g, "&lt;")}</h2>
-<p style="color:#94a3b8;font-size:0.9rem">本章 <code>publishedContent</code> 已由 API 拉取。任务 12 将在此用 Pyodide 跑各 cell 并调用 <code>POST /v1/student/cells/verify</code>。</p>
-</body></html>`;
-
   return (
-    <main className="sd-root">
+    <main className={`sd-root${screen === "chapter" ? " sd-wide" : ""}`}>
       <header className="sd-header">
         <h1>学生端（Tauri）</h1>
         <p className="sd-meta">
@@ -170,7 +163,7 @@ function App() {
       )}
 
       {screen === "chapter" && selected && (
-        <section className="sd-card">
+        <section className="sd-card sd-chapter-wrap">
           <button
             type="button"
             className="sd-btn-ghost"
@@ -181,13 +174,18 @@ function App() {
           >
             ← 返回列表
           </button>
-          <h2>{selected.title}</h2>
-          <p className="sd-muted">状态: {selected.contentStatus}</p>
-          <div className="sd-iframe-wrap">
-            {iframeSrcDoc && (
-              <iframe title="chapter-preview" srcDoc={iframeSrcDoc} />
-            )}
-          </div>
+          {selected.publishedContent ? (
+            <ChapterPractice
+              chapterId={selected.id}
+              title={selected.title}
+              publishedContent={selected.publishedContent}
+            />
+          ) : (
+            <>
+              <h2>{selected.title}</h2>
+              <p className="sd-muted">本章暂无 publishedContent。</p>
+            </>
+          )}
         </section>
       )}
     </main>
