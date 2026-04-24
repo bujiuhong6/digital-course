@@ -67,7 +67,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
         className="sd-chat-fab"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        title="学习助手"
+        title="AI学习助手"
       >
         <span className="sd-chat-fab-icon" aria-hidden>
           ✦
@@ -79,7 +79,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
       )}
       <aside
         className={`sd-chat-panel${open ? " is-open" : ""}`}
-        aria-label="学习助手"
+        aria-label="AI学习助手"
       >
         <header className="sd-chat-hd">
           <img
@@ -90,7 +90,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
             alt=""
             aria-hidden
           />
-          <h2>学习助手</h2>
+          <h2>AI学习助手</h2>
           <button
             type="button"
             className="sd-chat-close"

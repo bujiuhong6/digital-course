@@ -17,7 +17,7 @@
 
 **任务 12**：在 WebView 中加载 **Pyodide**（`index.html` 从 CDN 引入；首次运行会拉取包体）。进入已发布章后，按 `publishedContent.version===1` 的 `blocks` 以 **Notebook 式**（`In [n]:`、灰底代码区，与 design §2/§5 一致）展示**知识/引导/扩展**；样式在 `public/jupyter-cells.css`，与 `services/api/app/static/jupyter-cells.css` **内容应保持一致**（改一处请同步复制）。「执行」运行代码并上报 `POST /v1/student/cells/verify`；全部通过后可「提交本章练习」完成本章。
 
-**学习助手（Chat）**：章练习页左下角有 **Chat** 按钮，展开后调 `POST /v1/student/chat`，会把当前聚焦代码格的 `cellId` 与代码作为 `currentCode` 发给服务端（与 API 限流/鉴权一致）。未配 LLM 时返回 `mock: true` 的占位说明。
+**AI学习助手（Chat）**：章练习页左下角有 **Chat** 按钮，展开后调 `POST /v1/student/chat`，会把当前聚焦代码格的 `cellId` 与代码作为 `currentCode` 发给服务端（与 API 限流/鉴权一致）。未配 LLM 时返回 `mock: true` 的占位说明。
 
 **保存草稿**：章底部 **「保存」** 将各格当前代码写入本机 **localStorage**（按 `学生 id + 章 id` 隔离）；切章或清浏览器站点数据会丢失。**提交本章练习** 成功时清除该章草稿。列表「练习中」在服务端有通过记录，或本机有非空草稿时显示。
 
