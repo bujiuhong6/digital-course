@@ -426,11 +426,6 @@ function ChapterPracticeInner({
               {b.knowledgeHtml
                 ? htmlMd(b.knowledgeHtml, `${b.id}-kp`)
                 : null}
-              {b.requiredExecutionMode ? (
-                <p className="jnb-hint" style={{ paddingLeft: 0, margin: "0.35rem 0" }}>
-                  执行环境：<code>{b.requiredExecutionMode}</code>
-                </p>
-              ) : null}
 
               <h3 className="jnb-h3">基础练习</h3>
               <h4 className="jnb-h4">{gTitle}</h4>

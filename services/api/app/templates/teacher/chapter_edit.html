@@ -94,9 +94,6 @@
     <div class="jnb-kp">
       <h2 class="jnb-h2">{{ sec }}</h2>
       {% if b.get('knowledgeHtml') %}<div class="jnb-md-cell">{{ b.get('knowledgeHtml', '')|safe }}</div>{% endif %}
-      {% if b.get('requiredExecutionMode') %}
-      <p class="jnb-hint" style="padding-left:0;margin:0.35rem 0">执行环境：<code>{{ b.get('requiredExecutionMode') }}</code></p>
-      {% endif %}
       {% set g = b.get('guideCell') %}
       {% if g %}
       <h3 class="jnb-h3">基础练习</h3>
