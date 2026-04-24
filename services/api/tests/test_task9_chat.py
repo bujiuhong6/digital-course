@@ -55,6 +55,32 @@ def test_chat_rate_limit(client, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @respx.mock
+def test_chat_upstream_connection_error_returns_502(
+    client, monkeypatch: pytest.MonkeyPatch, respx_mock: respx.MockRouter
+) -> None:
+    ch_id = _published_chapter_id(client)
+    tok = _student_token(client)
+    h = {"Authorization": f"Bearer {tok}"}
+    monkeypatch.setattr(config.settings, "chat_llm_base_url", "https://unreachable-llm.example")
+    monkeypatch.setattr(config.settings, "chat_llm_api_key", "k")
+    respx_mock.post("https://unreachable-llm.example/v1/chat/completions").mock(
+        side_effect=httpx.ConnectError("simulated: no route to host"),
+    )
+    r = client.post(
+        "/v1/student/chat",
+        json={
+            "chapterId": ch_id,
+            "cellId": "c1",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+        headers=h,
+    )
+    assert r.status_code == 502
+    detail = r.json().get("detail", "")
+    assert "upstream_unavailable" in str(detail) or "ConnectError" in str(detail)
+
+
+@respx.mock
 def test_chat_upstream_200(
     client, monkeypatch: pytest.MonkeyPatch, respx_mock: respx.MockRouter
 ) -> None:
