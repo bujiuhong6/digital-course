@@ -1,0 +1,39 @@
+{% extends "teacher/base.html" %}
+{% block title %}班级{% endblock %}
+{% block body %}
+<div class="bar">
+  <h1 style="margin:0">班级</h1>
+  <a class="btn secondary" href="/teacher">返回概览</a>
+</div>
+
+{% if request.query_params.get("ok") == "1" %}
+<p class="flash-ok" role="status">✓ 已创建班级。</p>
+{% elif request.query_params.get("err") == "1" %}
+<p class="flash-err" role="status">✗ 请填写班级名称。</p>
+{% elif request.query_params.get("dup") == "1" %}
+<p class="flash-err" role="status">✗ 该名称已存在，请用其他名称。</p>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0">新建班级</h2>
+  <form method="post" action="/teacher/classes/new">
+    <label for="cn">班级名称</label>
+    <input id="cn" name="name" type="text" required maxlength="128" placeholder="例如：2026 春季 A 班"/>
+    <p><button type="submit">创建</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">已有班级</h2>
+  {% if not classes %}
+  <p>暂无。请先新建。</p>
+  {% else %}
+  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/roster">名单</a>」页将已注册学生分配到班级。</p>
+  <ul style="margin:0;padding-left:1.2rem">
+    {% for c in classes %}
+    <li><strong>{{ c.name }}</strong> <code style="color:var(--muted)">{{ c.id }}</code></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

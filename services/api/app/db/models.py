@@ -53,11 +53,32 @@ class Student(Base):
         server_default=func.now(),
     )
 
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("classes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    class_: Mapped["Class | None"] = relationship("Class", back_populates="students")
+
     roster_entry: Mapped["RosterEntry | None"] = relationship(
         "RosterEntry",
         back_populates="student",
         uselist=False,
     )
+
+
+class Class(Base):
+    __tablename__ = "classes"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    students: Mapped[list["Student"]] = relationship("Student", back_populates="class_")
 
 
 class RosterEntry(Base):

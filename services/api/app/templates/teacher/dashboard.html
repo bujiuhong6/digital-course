@@ -3,7 +3,10 @@
 {% block body %}
 <div class="bar">
   <h1 style="margin:0">章与素材</h1>
-  <a class="btn secondary" href="/teacher/roster">名单</a>
+  <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+    <a class="btn secondary" href="/teacher/roster">名单</a>
+    <a class="btn secondary" href="/teacher/classes">班级{% if class_count is defined and class_count %}（{{ class_count }}）{% endif %}</a>
+  </div>
 </div>
 
 <div class="card">
