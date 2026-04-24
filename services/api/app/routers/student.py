@@ -73,6 +73,7 @@ async def register(body: RegisterBody, db: DBSession) -> dict:
         full_name=body.full_name,
         password_ciphertext=encrypt_password(body.password),
         must_change_password=False,
+        class_id=row.class_id,
     )
     db.add(st)
     await db.flush()

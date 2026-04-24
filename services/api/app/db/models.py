@@ -98,8 +98,14 @@ class RosterEntry(Base):
         ForeignKey("students.id", ondelete="SET NULL"),
         nullable=True,
     )
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("classes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     student: Mapped["Student | None"] = relationship(back_populates="roster_entry")
+    class_: Mapped["Class | None"] = relationship("Class", foreign_keys=[class_id])
 
 
 class AdminAudit(Base):

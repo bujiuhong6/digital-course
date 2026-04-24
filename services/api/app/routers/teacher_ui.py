@@ -30,6 +30,7 @@ from ..services.chapter_gen import generate_chapter_draft
 from ..services.chapter_json import validate_for_publish, sample_published_v1
 
 from .admin import (  # noqa: PLC2701
+    _get_or_create_class_id,
     _load_rows_from_file,
     _set_teacher_cookie,
     _upsert_roster_row,
@@ -472,10 +473,11 @@ async def ui_roster_import(
     raw = await file.read()
     rows = _load_rows_from_file(raw, file.filename)
     n = 0
-    for sn, fn in rows:
+    for sn, fn, class_label in rows:
         if not sn or not fn:
             continue
-        await _upsert_roster_row(db, sn, fn)
+        cid = await _get_or_create_class_id(db, class_label)
+        await _upsert_roster_row(db, sn, fn, cid)
         n += 1
     return templates.TemplateResponse(
         request,

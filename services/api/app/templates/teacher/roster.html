@@ -19,7 +19,7 @@
 {% endif %}
 
 <div class="card">
-  <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头两列名为 <strong>学号</strong>、<strong>姓名</strong>。</p>
+  <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头须含 <strong>学号</strong>、<strong>姓名</strong>、<strong>班级</strong> 三列（「班级」可留空，系统会按名称建班/分班）。</p>
   <form
     hx-post="/teacher/roster/import"
     hx-encoding="multipart/form-data"
