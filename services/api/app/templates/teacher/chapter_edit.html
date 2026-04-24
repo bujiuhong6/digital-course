@@ -84,27 +84,32 @@
   <p class="jnb-teacher-banner">与下方「已发布 JSON」为同一份数据；本区为易读版。</p>
   <div class="teacher-jnb jnb-teacher-embed">
     <div class="jnb-page">
+    <h1 class="jnb-chapter-h1">{{ ch.title }}</h1>
+    {% if ch.published_content.get('chapterIntroHtml') %}
+    <div class="jnb-md-cell">{{ ch.published_content.get('chapterIntroHtml')|safe }}</div>
+    {% endif %}
     {% for b in ch.published_content['blocks'] %}
     {% set bi = loop.index0 %}
-    {% set i0 = bi * 3 + 1 %}
-    {% set iGuide = i0 + 1 %}
-    {% set iExt = i0 + 2 %}
-    <section class="jnb-section jnb-surface">
-      <div class="jnb-sec-h">第 <strong>{{ loop.index }}</strong> 块</div>
+    {% set sec = b.get('sectionTitle') or '知识点 ' ~ (bi + 1) %}
+    <div class="jnb-kp">
+      <h2 class="jnb-h2">{{ sec }}</h2>
+      {% if b.get('knowledgeHtml') %}<div class="jnb-md-cell">{{ b.get('knowledgeHtml', '')|safe }}</div>{% endif %}
       {% if b.get('requiredExecutionMode') %}
-      <p class="jnb-hint" style="padding-left:0;margin-top:0">要求运行环境：<code>{{ b['requiredExecutionMode'] }}</code></p>
+      <p class="jnb-hint" style="padding-left:0;margin:0.35rem 0">执行环境：<code>{{ b.get('requiredExecutionMode') }}</code></p>
       {% endif %}
-      <div class="jnb-code-cell">
-        <span class="jnb-prompt">In [{{ i0 }}]:</span>
-        <div class="jnb-code-col"><div class="jnb-md-cell">{{ b.get('knowledgeHtml', '')|safe }}</div></div>
-      </div>
       {% set g = b.get('guideCell') %}
       {% if g %}
-      <div class="jnb-label" style="margin-top:0.75rem">引导</div>
-      {% if g.get('description') %}<p class="jnb-cell-desc" style="margin-top:0">{{ g.get('description', '') }}</p>{% endif %}
-      <div class="jnb-code-cell">
-        <span class="jnb-prompt">In [{{ iGuide }}]:</span>
-        <div class="jnb-code-col"><pre class="jnb-input-ro">{{ g.get('starterCode', '') }}</pre></div>
+      <h3 class="jnb-h3">基础练习</h3>
+      <h4 class="jnb-h4">{{ g.get('exerciseTitle') or '第 1 题（基础）' }}</h4>
+      <div class="jnb-md-cell">{{ g.get('description', '')|safe }}</div>
+      {% if g.get('expectedOutput') %}
+      <div class="jnb-expected">
+        <div class="jnb-expected-h">题目期望的输出或结果</div>
+        <div class="jnb-expected-body">{{ g.get('expectedOutput') }}</div>
+      </div>
+      {% endif %}
+      <div class="jnb-code-row"><span class="jnb-prompt jnb-prompt--code">代码</span>
+        <div class="jnb-code-col"><pre class="jnb-input-ro" style="margin:0">{{ g.get('starterCode', '') }}</pre></div>
       </div>
       {% if g.get('referenceAnswer') %}
       <div class="jnb-ref" style="margin-left:0.25rem">
@@ -120,14 +125,17 @@
       {% endif %}
       {% set ex = b.get('extensionCell') %}
       {% if ex %}
-      <div class="jnb-label" style="margin-top:0.75rem">扩展</div>
-      <div class="jnb-code-cell">
-        <span class="jnb-prompt jnb-prompt--muted">（说明）</span>
-        <div class="jnb-code-col"><div class="jnb-md-cell">{{ (ex.get('promptHtml') or '')|safe }}</div></div>
+      <h3 class="jnb-h3 jnb-h3--ext">扩展练习</h3>
+      <h4 class="jnb-h4">{{ ex.get('exerciseTitle') or '第 1 题（扩展）' }}</h4>
+      <div class="jnb-md-cell">{{ (ex.get('promptHtml') or '')|safe }}</div>
+      {% if ex.get('expectedOutput') %}
+      <div class="jnb-expected">
+        <div class="jnb-expected-h">题目期望的输出或结果</div>
+        <div class="jnb-expected-body">{{ ex.get('expectedOutput') }}</div>
       </div>
-      <div class="jnb-code-cell">
-        <span class="jnb-prompt">In [{{ iExt }}]:</span>
-        <div class="jnb-code-col">{% if ex.get('starterCode') %}<pre class="jnb-input-ro">{{ ex.get('starterCode') }}</pre>{% else %}<p class="jnb-cell-desc" style="padding-left:0">（无起始代码，由学生自写）</p>{% endif %}</div>
+      {% endif %}
+      <div class="jnb-code-row"><span class="jnb-prompt jnb-prompt--code">代码</span>
+        <div class="jnb-code-col">{% if ex.get('starterCode') %}<pre class="jnb-input-ro" style="margin:0">{{ ex.get('starterCode') }}</pre>{% else %}<p class="jnb-cell-desc" style="padding-left:0">（无起始代码，由学生自写）</p>{% endif %}</div>
       </div>
       {% if ex.get('referenceAnswer') %}
       <div class="jnb-ref" style="margin-left:0.25rem">
@@ -141,7 +149,7 @@
         {% if epr.get('assertCode') %}，断言 <code>{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
       </p>
       {% endif %}
-    </section>
+    </div>
     {% endfor %}
     </div>
   </div>
