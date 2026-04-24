@@ -9,6 +9,8 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY config ./config
 COPY app ./app
+# Jinja2 模板（任务 10 教师 Web）
+RUN test -d app/templates
 RUN pip install --no-cache-dir --no-compile .
 
 ENV DATABASE_URL=sqlite+aiosqlite:////data/teach.db

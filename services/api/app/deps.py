@@ -79,6 +79,17 @@ async def get_current_student(
 CurrentStudent = Annotated[Student, Depends(get_current_student)]
 
 
+async def teacher_cookie_valid(teacher_session: str | None, db: AsyncSession) -> bool:
+    """供 HTML 教师页判断 Cookie 是否仍有效（`teacher_session` + `admin_config`）。"""
+    if not teacher_session:
+        return False
+    data = parse_teacher_session_value(teacher_session)
+    if data is None:
+        return False
+    res = await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+    return res.scalar_one_or_none() is not None
+
+
 def require_bootstrap_token(provided: str | None) -> None:
     expected = settings.admin_bootstrap_token
     if not expected:

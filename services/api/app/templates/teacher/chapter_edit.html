@@ -1,0 +1,48 @@
+{% extends "teacher/base.html" %}
+{% block title %}{{ ch.title }}{% endblock %}
+{% block body %}
+<div class="bar">
+  <h1 style="margin:0">{{ ch.title }} <small style="color:var(--muted)"><code>{{ ch.slug }}</code></small></h1>
+  <a class="btn secondary" href="/teacher">返回列表</a>
+</div>
+
+<div id="flash" class="card" style="min-height:2.5rem"></div>
+
+<div class="card">
+  <h2 style="margin-top:0">草稿 JSON（<code>ai_generated_draft</code>）</h2>
+  <p>须符合 <strong>version 1</strong> 章 JSON；可粘贴后保存，再点发布。</p>
+  <form
+    id="fdraft"
+    hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
+    hx-target="#flash"
+    hx-swap="innerHTML"
+  >
+    <textarea name="draft" rows="18">{{ draft_json }}</textarea>
+    <p>
+      <button type="submit">保存草稿</button>
+    </p>
+  </form>
+  <p>
+    <form
+      hx-post="/teacher/chapters/{{ ch.id }}/generate"
+      hx-target="#flash"
+      hx-swap="innerHTML"
+      style="display:inline"
+    >
+      <button type="submit" class="secondary">从素材用 LLM 生成</button>
+    </form>
+    <form
+      hx-post="/teacher/chapters/{{ ch.id }}/publish"
+      hx-target="#flash"
+      hx-swap="innerHTML"
+      style="display:inline"
+    >
+      <button type="submit" style="background:#16a34a">发布</button>
+    </form>
+  </p>
+  <p style="color:var(--muted); font-size:0.85rem">
+    当前状态：<strong>{{ ch.content_status }}</strong>
+    · 素材在 API 中编辑 <code>sourceMaterial</code> 或使用 mock 生章
+  </p>
+</div>
+{% endblock %}

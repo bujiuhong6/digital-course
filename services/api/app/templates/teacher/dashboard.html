@@ -1,0 +1,38 @@
+{% extends "teacher/base.html" %}
+{% block title %}概览{% endblock %}
+{% block body %}
+<div class="bar">
+  <h1 style="margin:0">章与素材</h1>
+  <a class="btn secondary" href="/teacher/roster">名单</a>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">新建章</h2>
+  <form method="post" action="/teacher/chapters/new">
+    <label for="t">标题</label>
+    <input id="t" name="title" type="text" value="新章节" required/>
+    <p><button type="submit">创建</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">章列表</h2>
+  {% if not chapters %}
+  <p>暂无。请先新建。</p>
+  {% else %}
+  <table>
+    <thead><tr><th>标题</th><th>slug</th><th>状态</th><th></th></tr></thead>
+    <tbody>
+      {% for c in chapters %}
+      <tr>
+        <td>{{ c.title }}</td>
+        <td><code>{{ c.slug }}</code></td>
+        <td>{{ c.content_status }}</td>
+        <td><a href="/teacher/chapters/{{ c.id }}/edit">编辑 / 发布</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

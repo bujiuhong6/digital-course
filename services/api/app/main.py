@@ -6,7 +6,7 @@ from sqlalchemy import text
 from .config import settings
 from .db import dispose_engine, get_engine
 from .db import models as _db_models  # noqa: F401 — register ORM metadata
-from .routers import admin, chapter_admin, chat, student
+from .routers import admin, chapter_admin, chat, student, teacher_ui
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ app = FastAPI(title="Teaching API", version="0.1.0", lifespan=lifespan)
 app.include_router(admin.router)
 app.include_router(chapter_admin.router)
 app.include_router(chat.router)
+app.include_router(teacher_ui.router)
 app.include_router(student.router)
 
 

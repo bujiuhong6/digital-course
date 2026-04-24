@@ -1,0 +1,31 @@
+{% extends "teacher/base.html" %}
+{% block title %}登录{% endblock %}
+{% block body %}
+<h1>教师登录</h1>
+<p>与 API 同域；成功后会设置 <code>teacher_session</code> Cookie。</p>
+
+{% if not need_bootstrap %}
+<form method="post" action="/teacher/do-login" class="card">
+  <label for="p">密码</label>
+  <input id="p" name="password" type="password" required autocomplete="current-password" />
+  <p style="margin-top:0.75rem">
+    <button type="submit">登录</button>
+  </p>
+</form>
+{% else %}
+<div class="card">
+  <p><strong>首次使用</strong>：设置唯一管理员密码（与 <code>POST /v1/admin/bootstrap</code> 等价）。</p>
+  <form method="post" action="/teacher/bootstrap">
+    {% if bootstrap_token_required %}
+    <label for="t">Bootstrap 令牌</label>
+    <input id="t" name="bootstrap_token" type="password" required/>
+    <p class="flash-err" style="font-size:0.85rem">须与环境变量 <code>ADMIN_BOOTSTRAP_TOKEN</code> 一致</p>
+    {% endif %}
+    <label for="p2">新密码</label>
+    <input id="p2" name="password" type="password" required minlength="1" />
+    <p><button type="submit">创建并进入</button></p>
+  </form>
+</div>
+{% endif %}
+<p><a href="/docs">OpenAPI 文档</a> · <a href="/">API 根</a></p>
+{% endblock %}
