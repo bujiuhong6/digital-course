@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "./api";
+import {
+  clearChapterCodeDraft,
+  loadChapterCodeDraft,
+  saveChapterCodeDraft,
+} from "./chapterDraftStorage";
 import { StudentChat } from "./StudentChat";
 import {
   runPythonInPyodide,
@@ -48,6 +53,24 @@ type PublishedV1 = {
   blocks: Block[];
 };
 
+/** 进入章时把本地草稿与题目 starter 合并（缺省用 starter） */
+function mergeDraftWithStarters(
+  draft: Record<string, string> | null,
+  blocks: Block[],
+): Record<string, string> {
+  const m: Record<string, string> = {};
+  for (const b of blocks) {
+    const g = b.guideCell;
+    const ex = b.extensionCell;
+    m[g.id] = draft && draft[g.id] !== undefined ? draft[g.id]! : g.starterCode;
+    m[ex.id] =
+      draft && draft[ex.id] !== undefined
+        ? draft[ex.id]!
+        : (ex.starterCode ?? "");
+  }
+  return m;
+}
+
 function isPublishedV1(x: unknown): x is PublishedV1 {
   if (!x || typeof x !== "object") {
     return false;
@@ -57,6 +80,8 @@ function isPublishedV1(x: unknown): x is PublishedV1 {
 }
 
 type Props = {
+  /** 与 localStorage 草稿隔离，须与 /v1/student/me 的 studentId 一致 */
+  studentId: string;
   chapterId: string;
   title: string;
   publishedContent: unknown;
@@ -242,16 +267,19 @@ function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
 }
 
 function ChapterPracticeInner({
+  studentId,
   chapterId,
   title,
   data,
 }: {
+  studentId: string;
   chapterId: string;
   title: string;
   data: PublishedV1;
 }) {
   const [codeMap, setCodeMap] = useState<Record<string, string>>({});
   const [cellState, setCellState] = useState<Record<string, CellState>>({});
+  const [saveHint, setSaveHint] = useState<string | null>(null);
   /** 仅当接口 200 成功时显示（jnb-footer-msg） */
   const [completeSuccessText, setCompleteSuccessText] = useState<string | null>(
     null,
@@ -276,6 +304,30 @@ function ChapterPracticeInner({
     }
     return (cell as GuideCell).starterCode;
   };
+
+  const buildCodeMapSnapshot = useCallback((): Record<string, string> => {
+    const m: Record<string, string> = {};
+    for (const b of data.blocks) {
+      const g = b.guideCell;
+      const ex = b.extensionCell;
+      m[g.id] = codeMap[g.id] !== undefined ? codeMap[g.id]! : g.starterCode;
+      m[ex.id] =
+        codeMap[ex.id] !== undefined
+          ? codeMap[ex.id]!
+          : (ex.starterCode ?? "");
+    }
+    return m;
+  }, [data.blocks, codeMap]);
+
+  const blocksStructureKey = useMemo(
+    () => data.blocks.map((b) => b.id).join(","),
+    [data.blocks],
+  );
+
+  useEffect(() => {
+    const draft = loadChapterCodeDraft(studentId, chapterId);
+    setCodeMap(mergeDraftWithStarters(draft, data.blocks));
+  }, [studentId, chapterId, blocksStructureKey, data.blocks]);
 
   const getCodeByCellId = useCallback(
     (cellId: string) => {
@@ -407,8 +459,19 @@ function ChapterPracticeInner({
     }
   };
 
+  const onSaveDraft = () => {
+    setSaveHint(null);
+    try {
+      saveChapterCodeDraft(studentId, chapterId, buildCodeMapSnapshot());
+      setSaveHint("已保存。下次进入本章可继续编辑。");
+    } catch {
+      setSaveHint("保存未成功。请重试或检查本机存储是否已满。");
+    }
+  };
+
   const onComplete = async () => {
     setCompleting(true);
+    setSaveHint(null);
     setCompleteSuccessText(null);
     setCompleteErrorText(null);
     try {
@@ -416,6 +479,9 @@ function ChapterPracticeInner({
         `/v1/student/chapters/${chapterId}/complete`,
         { method: "POST" },
       );
+      if (r.alreadyCompleted !== true) {
+        clearChapterCodeDraft(studentId, chapterId);
+      }
       setCompleteSuccessText(
         r.alreadyCompleted ? "本章此前已标记完成" : "本章已标记完成",
       );
@@ -592,13 +658,23 @@ function ChapterPracticeInner({
         })}
 
         <div className="jnb-footer-actions">
-          <button
-            type="button"
-            onClick={() => void onComplete()}
-            disabled={completing}
-          >
-            {completing ? "提交中…" : "提交本章练习"}
-          </button>
+          <div className="jnb-footer-row">
+            <button
+              type="button"
+              className="jnb-btn-secondary"
+              onClick={onSaveDraft}
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              onClick={() => void onComplete()}
+              disabled={completing}
+            >
+              {completing ? "提交中…" : "提交本章练习"}
+            </button>
+          </div>
+          {saveHint ? <p className="jnb-footer-hintline">{saveHint}</p> : null}
           {completeSuccessText ? (
             <p className="jnb-footer-msg">{completeSuccessText}</p>
           ) : null}
@@ -614,7 +690,12 @@ function ChapterPracticeInner({
   );
 }
 
-export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
+export function ChapterPractice({
+  studentId,
+  chapterId,
+  title,
+  publishedContent,
+}: Props) {
   if (!isPublishedV1(publishedContent)) {
     return (
       <p className="sd-muted">本章尚无有效的 publishedContent（需要 version: 1 与 blocks）。</p>
@@ -622,6 +703,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
   }
   return (
     <ChapterPracticeInner
+      studentId={studentId}
       chapterId={chapterId}
       title={title}
       data={publishedContent}

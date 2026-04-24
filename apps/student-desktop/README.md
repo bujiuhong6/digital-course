@@ -19,6 +19,9 @@
 
 **学习助手（Chat）**：章练习页左下角有 **Chat** 按钮，展开后调 `POST /v1/student/chat`，会把当前聚焦代码格的 `cellId` 与代码作为 `currentCode` 发给服务端（与 API 限流/鉴权一致）。未配 LLM 时返回 `mock: true` 的占位说明。
 
+**保存草稿**：章底部 **「保存」** 将各格当前代码写入本机 **localStorage**（按 `学生 id + 章 id` 隔离）；切章或清浏览器站点数据会丢失。**提交本章练习** 成功时清除该章草稿。列表「练习中」在服务端有通过记录，或本机有非空草稿时显示。
+
+
 ## 开发
 
 在仓库根启动 API 后（`services/api` 内 `uvicorn app.main:app --reload` 等）：
