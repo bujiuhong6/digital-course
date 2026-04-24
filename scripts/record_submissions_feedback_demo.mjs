@@ -37,7 +37,7 @@ async function main() {
   await s.getByLabel("学号").fill(STU.no);
   await s.getByLabel("密码").fill(STU.pw);
   await s.getByRole("button", { name: "进入" }).click();
-  await s.getByText("已发布章").waitFor();
+  await s.getByText("章节练习列表").waitFor();
   await s.getByText(/E2E 演示/).first().click();
   await s.locator("textarea.jnb-input").first().waitFor();
   await w(1000);
