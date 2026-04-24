@@ -3,8 +3,8 @@
 
 登录与 bootstrap 成功后会 **Set-Cookie: teacher_session=...**（HMAC-SHA256 签名，见 `app.services.teacher_session`）。
 
-名单 `POST /v1/admin/roster/import` 支持 `multipart` 上传文件（`file` 字段，.csv 或 .json）或
-`Content-Type: application/json` 的 `{"rows":[{"studentNo","fullName"},...]}`。字段 **camelCase** 见 OpenAPI。
+名单 `POST /v1/admin/roster/import` 支持 `multipart` 上传文件（`file` 字段，**.csv、.xlsx 或 .json**）或
+`Content-Type: application/json` 的 `{"rows":[{"studentNo","fullName"},...]}`。表格需第一行表头；**CSV / xlsx** 为 **学号**、**姓名** 两列（UTF-8）。
 """
 
 from __future__ import annotations
@@ -135,20 +135,13 @@ def _iter_csv_rows(data: str) -> Iterator[tuple[str, str]]:
     r = csv.DictReader(f)
     if not r.fieldnames:
         return
-    norm = {h.strip().lower().replace(" ", ""): h for h in r.fieldnames if h}
-    no_key = _pick_col(
-        norm,
-        ("studentno", "student_no", "学号", "id"),
-    )
-    name_key = _pick_col(
-        norm,
-        ("fullname", "name", "full_name", "姓名", "name_zh"),
-    )
-    if not no_key or not name_key:
+    fieldnames = [h.strip() for h in (r.fieldnames or []) if h and h.strip()]
+    if "学号" not in fieldnames or "姓名" not in fieldnames:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="csv_headers_missing: need student number + full name columns",
+            detail="csv_headers_missing: 表头需含列「学号」与「姓名」",
         )
+    no_key, name_key = "学号", "姓名"
     for row in r:
         a = (row.get(no_key) or "").strip()
         b = (row.get(name_key) or "").strip()
@@ -157,15 +150,6 @@ def _iter_csv_rows(data: str) -> Iterator[tuple[str, str]]:
         if not a or not b:
             continue
         yield a, b
-
-
-def _pick_col(name_map: dict[str, str], keys: tuple[str, ...]) -> str | None:
-    for k in keys:
-        nk = k.lower().replace(" ", "")
-        for cand, orig in name_map.items():
-            if cand.replace(" ", "") == nk:
-                return orig
-    return None
 
 
 def _rows_from_json_raw(raw: object) -> list[tuple[str, str]]:
@@ -177,8 +161,64 @@ def _rows_from_json_raw(raw: object) -> list[tuple[str, str]]:
     return [(i.student_no.strip(), i.full_name.strip()) for i in items]
 
 
+def _load_rows_xlsx(content: bytes) -> list[tuple[str, str]]:
+    """首行表头须含列名 **学号**、**姓名**（严格匹配，去首尾空格）。"""
+    try:
+        from openpyxl import load_workbook
+    except ImportError as e:  # pragma: no cover
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="xlsx support unavailable",
+        ) from e
+    bio = io.BytesIO(content)
+    wb = load_workbook(bio, read_only=True, data_only=True)
+    try:
+        ws = wb.active
+        it = ws.iter_rows(values_only=True)
+        header = next(it, None)
+        if not header:
+            return []
+
+        def cell_str(v: object) -> str:
+            if v is None:
+                return ""
+            return str(v).strip()
+
+        hlist = [cell_str(c) for c in header]
+        try:
+            i_no = hlist.index("学号")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="xlsx_headers_missing: 首行表头需含列「学号」",
+            ) from e
+        try:
+            i_name = hlist.index("姓名")
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="xlsx_headers_missing: 首行表头需含列「姓名」",
+            ) from e
+        out: list[tuple[str, str]] = []
+        for row in it:
+            if row is None:
+                continue
+            a = cell_str(row[i_no]) if i_no < len(row) else ""
+            b = cell_str(row[i_name]) if i_name < len(row) else ""
+            if not a and not b:
+                continue
+            if not a or not b:
+                continue
+            out.append((a, b))
+        return out
+    finally:
+        wb.close()
+
+
 def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str]]:
     name = (filename or "").lower()
+    if name.endswith(".xlsx"):
+        return _load_rows_xlsx(content)
     as_json = name.endswith(".json")
     if not as_json and content and content[0:1] in (b"{", b"["):
         as_json = True
