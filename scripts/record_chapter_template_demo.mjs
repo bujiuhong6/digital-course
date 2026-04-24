@@ -34,7 +34,7 @@ async function main() {
   await s.getByLabel("学号").fill("E2E0001");
   await s.getByLabel("密码").fill("E2EPass123");
   await s.getByRole("button", { name: "进入" }).click();
-  await s.getByText("章节练习列表").waitFor();
+  await s.getByText("已发布章节练习").waitFor();
   await s.getByText(/E2E 演示章/).first().click();
   await s
     .getByRole("heading", { name: /E2E 演示章/ })

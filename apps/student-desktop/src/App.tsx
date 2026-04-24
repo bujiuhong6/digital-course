@@ -298,7 +298,7 @@ function App() {
 
       {screen === "chapters" && (
         <section className="sd-card">
-          <h2>章节练习列表</h2>
+          <h2>已发布章节练习</h2>
           {chapters.length === 0 ? (
             <p>暂无。请教师端发布章后再试。</p>
           ) : (
