@@ -76,10 +76,54 @@
   </p>
 </div>
 
+{% if published_json and ch.published_content and ch.published_content.get('version') == 1 and ch.published_content.get('blocks') %}
+<div class="card">
+  <h2 style="margin-top:0">发布预览（与学生端章练习同结构，只读）</h2>
+  <p>下方布局与学生桌面里本章练习页一致；代码在浏览器内由学生运行（Pyodide），此处不执行。要修改呈现请改草稿后重新发布。</p>
+  <div class="nb-wrap">
+    {% for b in ch.published_content['blocks'] %}
+    <div class="nb-block">
+      {% if b.get('requiredExecutionMode') %}
+      <p class="nb-mode">要求运行环境：{{ b['requiredExecutionMode'] }}</p>
+      {% endif %}
+      <h3>知识</h3>
+      <div class="nb-prose">{{ b.get('knowledgeHtml', '')|safe }}</div>
+      {% set g = b.get('guideCell') %}
+      {% if g %}
+      <h3>引导</h3>
+      <p class="nb-hint">{{ g.get('description', '') }}</p>
+      <pre class="nb-code-ro">{{ g.get('starterCode', '') }}</pre>
+      {% set gpr = g.get('passRule') or {} %}
+      <p class="nb-hint">过关：模式 <code>{{ gpr.get('mode', '') }}</code>
+        {% if gpr.get('expectedSubstring') %}，stdout 须含 <code>{{ gpr.get('expectedSubstring') }}</code>{% endif %}
+        {% if gpr.get('assertCode') %}，断言 <code>{{ gpr.get('assertCode', '')[:200] }}{% if (gpr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
+      </p>
+      {% endif %}
+      {% set ex = b.get('extensionCell') %}
+      {% if ex %}
+      <h3>扩展</h3>
+      <div class="nb-prose">{{ (ex.get('promptHtml') or '')|safe }}</div>
+      {% if ex.get('starterCode') %}
+      <pre class="nb-code-ro">{{ ex.get('starterCode') }}</pre>
+      {% else %}
+      <p class="nb-hint">（扩展题无起始代码，由学生自写）</p>
+      {% endif %}
+      {% set epr = ex.get('passRule') or {} %}
+      <p class="nb-hint">过关：模式 <code>{{ epr.get('mode', '') }}</code>
+        {% if epr.get('expectedSubstring') %}，stdout 须含 <code>{{ epr.get('expectedSubstring') }}</code>{% endif %}
+        {% if epr.get('assertCode') %}，断言 <code>{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
+      </p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if published_json %}
 <div class="card">
-  <h2 style="margin-top:0">已发布内容（<code>publishedContent</code>，只读）</h2>
-  <p>与学生端 <code>GET /v1/student/chapters/{id}</code> 中收到的正文一致。若要改版面，请改下方草稿后<strong>再次发布</strong>（会覆盖学生可见内容）。</p>
+  <h2 style="margin-top:0">已发布 JSON（<code>publishedContent</code>，只读）</h2>
+  <p>与 API / 学生端数据一致。改版面以「发布预览」为准；本框便于复制或排查格式。</p>
   <label for="pubro">学生可见章 JSON</label>
   <textarea id="pubro" readonly rows="20" class="ro">{{ published_json }}</textarea>
 </div>
