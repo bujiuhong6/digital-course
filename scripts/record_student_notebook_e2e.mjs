@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 
 const BASE = "http://127.0.0.1:4173";
 const runBtn = { name: "执行" };
-const completeBtn = { name: "尝试标记本章完成" };
+const completeBtn = { name: "提交本章练习" };
 
 async function main() {
   // 默认有界面：无头环境常无法从 CDN 拉全 Pyodide。本地可用 HEADLESS=1 强制无头

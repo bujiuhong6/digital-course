@@ -68,7 +68,7 @@ async function main() {
   );
   await pause(2500);
 
-  await page.getByRole("button", { name: "尝试标记本章完成" }).click();
+  await page.getByRole("button", { name: "提交本章练习" }).click();
   await page
     .getByText(/本章(已标记完成|此前已标记完成)/)
     .waitFor({ timeout: 30_000 });
