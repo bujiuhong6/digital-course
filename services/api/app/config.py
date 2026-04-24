@@ -34,8 +34,32 @@ class Settings(BaseSettings):
     )
     chapter_extension_starter_code_max_len: int = 8000
     generator_prompt_version: str = "v1"
-    # 发布时：扩展题 passRule 仅 `no_exception` 时是否拒绝（设计 §4.2 建议更强规则）
+    # 发布时：扩展题 passRule 仅 `no_exception` 时是否拒绝（设计 §4.2 建议 stronger 规则）
     chapter_publish_reject_extension_no_exception: bool = True
+    # 任务 9 / 设计 §7；环境名与设计文档一致
+    chat_llm_base_url: str = Field(
+        default="",
+        description="OpenAI 兼容聊天 API 基址。",
+        validation_alias=AliasChoices("CHAT_LLM_BASE_URL",),
+    )
+    chat_llm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CHAT_LLM_API_KEY",),
+    )
+    chat_model: str = Field(
+        default="gpt-4o-mini",
+    )
+    chat_context_max_chars: int = Field(
+        default=12_000,
+        validation_alias=AliasChoices("CHAT_CONTEXT_MAX_CHARS",),
+    )
+    chat_rpm: int = Field(
+        default=20,
+    )
+    chat_daily_token_budget: int = Field(
+        default=0,
+        description="0 表示不限制。",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

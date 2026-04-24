@@ -1,0 +1,196 @@
+"""
+学生 **聊天代理**（设计 §7：无 RAG；§6/§7：上下文截断、OpenAI 兼容；任务 9）。
+
+- **`POST /v1/student/chat`**：Body `chapterId`, `cellId`, `messages`；可选 `stream` 流式（SSE 文本行）。
+- 题面+消息拼入用户提示，截断至 `chat_context_max_chars`。
+- 限流见 `chat_limiter`（每生每分钟、可选每日 token 预算）。
+
+环境变量在 **设置** 中对应 `CHAT_LLM_BASE_URL` / `CHAT_LLM_API_KEY` 等，见 `Settings` 字段 Pydantic 名。
+"""
+
+from __future__ import annotations
+
+import json
+import uuid
+from collections.abc import AsyncIterator
+from datetime import datetime, timezone
+
+import httpx
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+
+from ..config import settings
+from ..db.models import Chapter
+from ..deps import CurrentStudent, DBSession
+from ..services.chat_limiter import check_and_record_request
+
+router = APIRouter(prefix="/v1/student", tags=["student", "chat"])
+
+
+class ChatMessage(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    role: str = Field(min_length=1, max_length=32)  # user | assistant 等
+    content: str = Field(max_length=200_000)
+
+
+class ChatBody(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    chapter_id: uuid.UUID = Field(alias="chapterId")
+    cell_id: str = Field(min_length=1, max_length=128, alias="cellId")
+    messages: list[ChatMessage] = Field(min_length=1, max_length=200)
+    stream: bool = False
+    # 学生当前代码（可空），截断在服务端
+    current_code: str | None = Field(default=None, max_length=200_000, alias="currentCode")
+
+
+def _truncate(s: str, cap: int) -> str:
+    if len(s) <= cap:
+        return s
+    return s[: cap - 1] + "…"
+
+
+def _build_user_prompt(
+    ch: dict | None,
+    cell_id: str,
+    user_msgs: str,
+    code: str | None,
+) -> str:
+    cap = max(1000, settings.chat_context_max_chars)
+    # 轻量题面：只取已发布 `publishedContent` 的短摘要式字符串（不整章外泄过长 HTML）
+    ctx_tail = ""
+    if ch is not None:
+        raw = json.dumps(ch, ensure_ascii=False)
+        ctx_tail = _truncate(raw, min(cap, cap // 2))
+    cpart = (code or "").strip()
+    cpart = _truncate(cpart, min(cap, cap // 2)) if cpart else ""
+    u = _truncate(user_msgs, min(cap, cap - len(ctx_tail) - len(cpart) - 200))
+    return (
+        f"Chapter context (JSON excerpt, may be trimmed):\n{ctx_tail}\n\n"
+        f"Cell id: {cell_id}\n"
+        f"User code (may be empty):\n```\n{cpart}\n```\n\n"
+        f"User messages (latest conversation):\n{u}"
+    )
+
+
+@router.post("/chat")
+async def student_chat(
+    me: CurrentStudent,
+    payload: ChatBody,
+    db: DBSession,
+):
+    r = await db.execute(
+        select(Chapter).where(Chapter.id == payload.chapter_id, Chapter.content_status == "published")
+    )
+    ch = r.scalar_one_or_none()
+    if ch is None or ch.published_content is None:
+        raise HTTPException(status_code=404, detail="chapter not found or not published")
+    if not isinstance(ch.published_content, dict):
+        raise HTTPException(status_code=400, detail="invalid published content")
+
+    plain_msgs = "\n".join(
+        f"{m.role}: {m.content[:50_000]}" for m in payload.messages[-30:]
+    )
+    user_prompt = _build_user_prompt(
+        ch.published_content,
+        payload.cell_id,
+        plain_msgs,
+        payload.current_code,
+    )
+
+    est = len(user_prompt) // 4
+    sid = str(me.id)
+    allowed, reason = check_and_record_request(
+        sid,
+        rpm=settings.chat_rpm,
+        est_tokens=est + 500,
+        daily_budget=settings.chat_daily_token_budget,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason,
+        )
+
+    base = (settings.chat_llm_base_url or settings.llm_base_url or "").strip().rstrip("/")
+    if not base:
+        # 开发/测试：不调用外网
+        payload = {
+            "ok": True,
+            "mock": True,
+            "message": "Chat LLM not configured; set CHAT_LLM_BASE_URL (or use LLM_BASE_URL).",
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
+        return JSONResponse(content=payload)
+
+    url = f"{base}/v1/chat/completions"
+    api_key = settings.chat_llm_api_key or settings.llm_api_key
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a short Python learning assistant. Answer in the user's language. "
+            "Do not output huge code dumps unless needed.",
+        },
+        {"role": "user", "content": _truncate(user_prompt, settings.chat_context_max_chars)},
+    ]
+    jbody: dict = {
+        "model": settings.chat_model,
+        "messages": messages,
+    }
+    if payload.stream:
+        jbody["stream"] = True
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    if payload.stream:
+        return StreamingResponse(
+            _stream_chat(url, jbody, headers),
+            media_type="text/event-stream",
+        )
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(url, json=jbody, headers=headers)
+    if resp.status_code == 429:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="upstream 429"
+        )
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=502, detail=resp.text[:2000] or f"http {resp.status_code}"
+        )
+    try:
+        out = resp.json()
+        text = out["choices"][0]["message"]["content"]
+    except (KeyError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=502, detail=f"bad upstream: {e!s}")
+    if not isinstance(text, str):
+        raise HTTPException(status_code=502, detail="empty assistant message")
+    return {
+        "ok": True,
+        "message": text,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def _stream_chat(
+    url: str, jbody: dict, headers: dict
+) -> AsyncIterator[bytes]:
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        async with client.stream("POST", url, json=jbody, headers=headers) as r:
+            if r.status_code >= 400:
+                err = (await r.aread())[:2000]
+                err_obj = {
+                    "error": f"http {r.status_code}",
+                    "body": err.decode("utf-8", errors="replace"),
+                }
+                yield f"data: {json.dumps(err_obj, ensure_ascii=False)}\n\n".encode()
+                return
+            async for line in r.aiter_lines():
+                if line == "":
+                    continue
+                yield (line if line.endswith("\n") else line + "\n").encode("utf-8")
+            yield b"data: [DONE]\n\n"

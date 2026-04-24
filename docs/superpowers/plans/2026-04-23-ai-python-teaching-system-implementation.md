@@ -226,11 +226,11 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件：** 新建 `routers/chat.py` 或挂在 `student.py`
 
-- [ ] **POST** `/v1/student/chat`，Body 带 `chapterId`、`cellId`、`messages`，转发到环境变量里 **OpenAI 兼容** 的聊天接口；**流式**可选项。
+- [x] **POST** `/v1/student/chat`，Body 带 `chapterId`、`cellId`、`messages`，转发到环境变量里 **OpenAI 兼容** 的聊天接口；**流式**可选项。
 
-- [ ] **限流**：按**学生**（内存**字典** 即可；日后可上 **Redis**）。
+- [x] **限流**：按**学生**（内存**字典** 即可；日后可上 **Redis**）。
 
-- [ ] **提交**
+- [x] **提交**
 
 ---
 
