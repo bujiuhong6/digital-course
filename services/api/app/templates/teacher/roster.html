@@ -5,9 +5,18 @@
 {% endblock %}
 {% block body %}
 <div class="bar">
-  <h1 style="margin:0">名单导入</h1>
-  <a class="btn secondary" href="/teacher">返回</a>
+  <h1 style="margin:0">名单</h1>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+    <a class="btn secondary" href="/teacher/classes">班级</a>
+    <a class="btn secondary" href="/teacher">返回</a>
+  </div>
 </div>
+
+{% if roster_flash %}
+<p class="{% if roster_flash_level == 'ok' %}flash-ok{% else %}flash-err{% endif %}" role="status">
+  {% if roster_flash_level == 'ok' %}✓{% else %}✗{% endif %} {{ roster_flash }}
+</p>
+{% endif %}
 
 <div class="card">
   <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头两列名为 <strong>学号</strong>、<strong>姓名</strong>。</p>
@@ -37,6 +46,46 @@
         <td>{{ r.student_no }}</td>
         <td>{{ r.full_name }}</td>
         <td>{% if r.status == "bound" %}已注册{% else %}未注册{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">已注册学生与班级</h2>
+  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/classes">班级</a>」页新建班级后，在此为学生选择班级。完成记录可按班级过滤。</p>
+  {% if not reg_students %}
+  <p>尚无已注册学生。</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>学号</th>
+        <th>姓名</th>
+        <th>班级</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in reg_students %}
+      <tr>
+        <td><code>{{ s.student_no }}</code></td>
+        <td>{{ s.full_name }}</td>
+        <td>{% if s.class %}{{ s.class.name }}{% else %}<span class="muted">未分班</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/teacher/students/{{ s.id }}/set-class" style="display:inline-flex;gap:0.35rem;align-items:center;margin:0;flex-wrap:wrap">
+            <label for="c-{{ s.id }}" style="font-size:0.85rem;color:var(--muted)">设班</label>
+            <select id="c-{{ s.id }}" name="class_id" style="max-width:12rem">
+              <option value="" {% if not s.class_id %}selected{% endif %}>未分班</option>
+              {% for cl in classes %}
+              <option value="{{ cl.id }}" {% if s.class_id and s.class_id == cl.id %}selected{% endif %}>{{ cl.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">保存</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

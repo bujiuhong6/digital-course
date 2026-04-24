@@ -10,7 +10,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
@@ -96,14 +96,19 @@ async def list_chapter_completions(
     _t: CurrentTeacher,
     db: DBSession,
     chapter_id: uuid.UUID,
+    class_id: uuid.UUID | None = Query(default=None, alias="classId"),
 ) -> dict:
-    """学生端「标记本章完成」后写入 `chapter_completions`；教师可查询提交记录。"""
+    """学生端「标记本章完成」后写入 `chapter_completions`；教师可查询提交记录。可选 `classId` 仅该班。"""
     ch = await _get_chapter_or_404(db, chapter_id)
-    r = await db.execute(
+    q = (
         select(ChapterCompletion, Student)
         .join(Student, Student.id == ChapterCompletion.student_id)
         .where(ChapterCompletion.chapter_id == chapter_id)
-        .order_by(ChapterCompletion.completed_at.desc())
+    )
+    if class_id is not None:
+        q = q.where(Student.class_id == class_id)
+    r = await db.execute(
+        q.order_by(ChapterCompletion.completed_at.desc())
     )
     rows = r.all()
     return {

@@ -11,13 +11,20 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote
 
-from fastapi import APIRouter, Cookie, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Cookie, File, Form, Query, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, update
 
 from ..config import settings
-from ..db.models import AdminConfig, Chapter, ChapterCompletion, RosterEntry, Student
+from ..db.models import (
+    AdminConfig,
+    Chapter,
+    ChapterCompletion,
+    Class as ClassModel,
+    RosterEntry,
+    Student,
+)
 from ..deps import DBSession, require_bootstrap_token, teacher_cookie_valid
 from ..services.chapter_gen import generate_chapter_draft
 from ..services.chapter_json import validate_for_publish, sample_published_v1
@@ -147,10 +154,12 @@ async def page_dashboard(
         return _redirect_login()
     r = await db.execute(select(Chapter).order_by(Chapter.order, Chapter.title))
     chapters = r.scalars().all()
+    r_cls = await db.execute(select(func.count()).select_from(ClassModel))
+    class_count = r_cls.scalar_one() or 0
     return templates.TemplateResponse(
         request,
         "teacher/dashboard.html",
-        {"chapters": chapters},
+        {"chapters": chapters, "class_count": class_count},
     )
 
 
@@ -202,25 +211,118 @@ async def ui_chapter_delete(
     return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@router.get("/classes", response_class=HTMLResponse)
+async def page_classes(
+    request: Request,
+    db: DBSession,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(
+        select(ClassModel).order_by(ClassModel.name)
+    )
+    classes = r.scalars().all()
+    return templates.TemplateResponse(
+        request,
+        "teacher/classes.html",
+        {"classes": classes},
+    )
+
+
+@router.post("/classes/new", response_class=HTMLResponse)
+async def ui_class_new(
+    request: Request,
+    db: DBSession,
+    name: str = Form(""),
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    label = (name or "").strip()
+    if not label:
+        return RedirectResponse(
+            url="/teacher/classes?err=1",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    ex = (
+        await db.execute(select(ClassModel).where(ClassModel.name == label))
+    ).scalar_one_or_none()
+    if ex is not None:
+        return RedirectResponse(
+            url="/teacher/classes?dup=1",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    db.add(ClassModel(name=label))
+    return RedirectResponse(
+        url="/teacher/classes?ok=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/students/{student_id}/set-class", response_class=HTMLResponse)
+async def ui_set_student_class(
+    db: DBSession,
+    student_id: uuid.UUID,
+    class_id: str = Form(""),
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    st = (
+        await db.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if st is None:
+        return HTMLResponse("学生不存在", status_code=404)
+    if not (class_id or "").strip():
+        st.class_id = None
+    else:
+        try:
+            cid = uuid.UUID(class_id.strip())
+        except ValueError:
+            return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
+        c = (await db.execute(select(ClassModel).where(ClassModel.id == cid))).scalar_one_or_none()
+        if c is None:
+            return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
+        st.class_id = c.id
+    return RedirectResponse(url="/teacher/roster?saved=1", status_code=303)
+
+
 @router.get("/chapters/{chapter_id}/completions", response_class=HTMLResponse)
 async def page_chapter_completions(
     request: Request,
     db: DBSession,
     chapter_id: uuid.UUID,
+    class_id: uuid.UUID | None = Query(default=None, alias="classId"),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
-    """学生「标记本章完成」后的提交记录（按章）。"""
+    """学生「标记本章完成」后的提交记录（按章；可选 `classId` 仅看该班学生）。"""
     if not await teacher_cookie_valid(teacher_session, db):
         return _redirect_login()
     r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
     ch = r.scalar_one_or_none()
     if ch is None:
         return HTMLResponse("章不存在", status_code=404)
-    r2 = await db.execute(
+    r_cls2 = await db.execute(
+        select(ClassModel).order_by(ClassModel.name)
+    )
+    all_classes = r_cls2.scalars().all()
+    current_class: ClassModel | None = None
+    if class_id is not None:
+        current_class = (
+            await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+        ).scalar_one_or_none()
+        if current_class is None:
+            class_id = None
+    q = (
         select(ChapterCompletion, Student)
         .join(Student, Student.id == ChapterCompletion.student_id)
         .where(ChapterCompletion.chapter_id == chapter_id)
-        .order_by(ChapterCompletion.completed_at.desc())
+    )
+    if class_id is not None:
+        q = q.where(Student.class_id == class_id)
+    r2 = await db.execute(
+        q.order_by(ChapterCompletion.completed_at.desc())
     )
     rows = r2.all()
     completions = [
@@ -238,6 +340,9 @@ async def page_chapter_completions(
             "ch": ch,
             "completions": completions,
             "submit_count": len(completions),
+            "all_classes": all_classes,
+            "filter_class_id": str(class_id) if class_id else None,
+            "filter_class": current_class,
         },
     )
 
@@ -246,20 +351,31 @@ async def page_chapter_completions(
 async def export_chapter_completions_csv(
     db: DBSession,
     chapter_id: uuid.UUID,
+    class_id: uuid.UUID | None = Query(default=None, alias="classId"),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
-    """导出本章「标记完成」学生学号、姓名（CSV，UTF-8 BOM 便于 Excel）。"""
+    """导出本章「标记完成」学生学号、姓名（CSV，UTF-8 BOM 便于 Excel）；`classId` 时仅该班。"""
     if not await teacher_cookie_valid(teacher_session, db):
         return _redirect_login()
     r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
     ch = r.scalar_one_or_none()
     if ch is None:
         return HTMLResponse("章不存在", status_code=404)
-    r2 = await db.execute(
+    if class_id is not None:
+        ccheck = (
+            await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+        ).scalar_one_or_none()
+        if ccheck is None:
+            class_id = None
+    q = (
         select(ChapterCompletion, Student)
         .join(Student, Student.id == ChapterCompletion.student_id)
         .where(ChapterCompletion.chapter_id == chapter_id)
-        .order_by(Student.student_no)
+    )
+    if class_id is not None:
+        q = q.where(Student.class_id == class_id)
+    r2 = await db.execute(
+        q.order_by(Student.student_no)
     )
     rows = r2.all()
     buf = io.StringIO()
@@ -275,11 +391,12 @@ async def export_chapter_completions_csv(
         )
     body = "\ufeff" + buf.getvalue()
     safe = quote(ch.slug[:40] or "chapter", safe="")
+    extra = f"-{str(class_id)[:8]}" if class_id is not None else ""
     return Response(
         content=body,
         media_type="text/csv; charset=utf-8",
         headers={
-            "Content-Disposition": f'attachment; filename="completions-{safe}.csv"',
+            "Content-Disposition": f'attachment; filename="completions-{safe}{extra}.csv"',
         },
     )
 
@@ -298,10 +415,42 @@ async def page_roster(
         .order_by(RosterEntry.student_no)
     )
     rows = r.scalars().all()
+    r_cls = await db.execute(
+        select(ClassModel).order_by(ClassModel.name)
+    )
+    classes = r_cls.scalars().all()
+    r_stu = await db.execute(
+        select(Student, ClassModel)
+        .outerjoin(ClassModel, Student.class_id == ClassModel.id)
+        .order_by(Student.student_no)
+    )
+    student_rows = r_stu.all()
+    reg_students: list[dict] = [
+        {
+            "id": st.id,
+            "student_no": st.student_no,
+            "full_name": st.full_name,
+            "class": cls_,
+            "class_id": st.class_id,
+        }
+        for st, cls_ in student_rows
+    ]
+    r_flash: str | None = None
+    r_level: str | None = None
+    if request.query_params.get("saved") == "1":
+        r_level, r_flash = "ok", "已更新班级。"
+    elif request.query_params.get("err") == "class":
+        r_level, r_flash = "err", "班级无效，请重试。"
     return templates.TemplateResponse(
         request,
         "teacher/roster.html",
-        {"rows": rows},
+        {
+            "rows": rows,
+            "classes": classes,
+            "reg_students": reg_students,
+            "roster_flash": r_flash,
+            "roster_flash_level": r_level,
+        },
     )
 
 
