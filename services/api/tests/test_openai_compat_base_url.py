@@ -1,4 +1,4 @@
-"""OpenAI 兼容基址归一化（避免 .../v1 + 代码 /v1 重复）与硅基流动式配置。"""
+"""OpenAI 兼容基址归一化（…/v1 去重）与厂商示例（硅基流动、OpenRouter 等）。"""
 
 from __future__ import annotations
 
@@ -36,6 +36,40 @@ def test_normalize_openai_compat_base_url() -> None:
         config.normalize_openai_compat_base_url("https://api.siliconflow.cn/v1/")
         == "https://api.siliconflow.cn"
     )
+    # OpenRouter 官方常写 base_url = https://openrouter.ai/api/v1；本仓库拼 /v1/chat/completions 故用 api 为根
+    assert (
+        config.normalize_openai_compat_base_url("https://openrouter.ai/api/v1")
+        == "https://openrouter.ai/api"
+    )
+    assert (
+        config.normalize_openai_compat_base_url("https://openrouter.ai/api/v1/")
+        == "https://openrouter.ai/api"
+    )
+
+
+def test_merge_adds_openrouter_optional_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config.settings, "openrouter_http_referer", "https://example.edu/")
+    monkeypatch.setattr(config.settings, "openrouter_title", "DigitalCourse")
+    h = config.merge_openai_compat_llm_headers(
+        "https://openrouter.ai/api",
+        {"Content-Type": "application/json", "Authorization": "Bearer x"},
+    )
+    assert h["Authorization"] == "Bearer x"
+    assert h.get("HTTP-Referer") == "https://example.edu/"
+    assert h.get("X-OpenRouter-Title") == "DigitalCourse"
+
+
+def test_merge_skips_referer_title_for_non_openrouter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config.settings, "openrouter_http_referer", "https://x.com/")
+    h = config.merge_openai_compat_llm_headers(
+        "https://api.siliconflow.cn",
+        {"Content-Type": "application/json"},
+    )
+    assert "HTTP-Referer" not in h
 
 
 @respx.mock
@@ -90,7 +124,7 @@ def test_chat_upstream_200_when_base_has_trailing_v1(
                 "choices": [
                     {
                         "message": {
-                            "content": "硅基流动路径正确。",
+                            "content": "ok-upstream",
                         }
                     }
                 ],
@@ -107,4 +141,4 @@ def test_chat_upstream_200_when_base_has_trailing_v1(
         headers=h,
     )
     assert r.status_code == 200
-    assert "硅基流动" in (r.json().get("message") or "")
+    assert (r.json().get("message") or "") == "ok-upstream"

@@ -20,7 +20,11 @@ from typing import Any
 
 import httpx
 
-from ..config import normalize_openai_compat_base_url, settings
+from ..config import (
+    merge_openai_compat_llm_headers,
+    normalize_openai_compat_base_url,
+    settings,
+)
 from .chapter_json import sample_published_v1
 
 _PROMPT_PATH = (
@@ -81,9 +85,10 @@ async def generate_chapter_draft(
             {"role": "user", "content": user_block},
         ],
     }
-    headers = {"Content-Type": "application/json"}
+    headers: dict[str, str] = {"Content-Type": "application/json"}
     if settings.llm_api_key:
         headers["Authorization"] = f"Bearer {settings.llm_api_key}"
+    headers = merge_openai_compat_llm_headers(base, headers)
 
     delay = 1.0
     last_err: str | None = "exhausted retries"
