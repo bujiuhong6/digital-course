@@ -572,7 +572,7 @@ function ChapterPracticeInner({
             onClick={() => void onComplete()}
             disabled={completing}
           >
-            {completing ? "…" : "尝试标记本章完成"}
+            {completing ? "提交中…" : "提交本章练习"}
           </button>
           {completeMsg && <p className="jnb-footer-msg">{completeMsg}</p>}
           <p className="jnb-footer-hint">
