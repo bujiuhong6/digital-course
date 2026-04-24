@@ -77,10 +77,14 @@
   font-weight: 700;
   flex: 1;
 }
-.sd-chat-dots {
-  color: #94a3b8;
-  letter-spacing: 0.1em;
-  font-size: 0.7rem;
+.sd-chat-hd-icon {
+  flex-shrink: 0;
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 .sd-chat-close {
   background: none;

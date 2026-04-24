@@ -82,9 +82,14 @@ export function StudentChat({ chapterId, getContext }: Props) {
         aria-label="学习助手"
       >
         <header className="sd-chat-hd">
-          <span className="sd-chat-dots" aria-hidden>
-            ···
-          </span>
+          <img
+            className="sd-chat-hd-icon"
+            src="/chat-assistant.svg"
+            width={24}
+            height={24}
+            alt=""
+            aria-hidden
+          />
           <h2>学习助手</h2>
           <button
             type="button"
