@@ -233,8 +233,6 @@ function ChapterPracticeInner({
   title: string;
   data: PublishedV1;
 }) {
-  const [pyStatus, setPyStatus] = useState<"idle" | "loading" | "ready" | "err">("idle");
-  const [pyErr, setPyErr] = useState<string | null>(null);
   const [codeMap, setCodeMap] = useState<Record<string, string>>({});
   const [cellState, setCellState] = useState<Record<string, CellState>>({});
   const [completeMsg, setCompleteMsg] = useState<string | null>(null);
@@ -288,21 +286,6 @@ function ChapterPracticeInner({
     return { cellId: id, currentCode: getCodeByCellId(id) };
   }, [activeCellId, defaultChatCellId, getCodeByCellId, data.blocks]);
 
-  const prewarmPyodide = useCallback(async () => {
-    if (pyStatus === "ready" || pyStatus === "loading") {
-      return;
-    }
-    setPyStatus("loading");
-    setPyErr(null);
-    try {
-      await ensurePyodide();
-      setPyStatus("ready");
-    } catch (e) {
-      setPyStatus("err");
-      setPyErr(String(e));
-    }
-  }, [pyStatus]);
-
   const runAndVerify = async (kind: CellKind, cell: GuideCell | ExtensionCell) => {
     const id = cell.id;
     setCellState((s) => ({
@@ -321,13 +304,9 @@ function ChapterPracticeInner({
     let run: Awaited<ReturnType<typeof runPythonInPyodide>>;
     try {
       await ensurePyodide();
-      setPyStatus("ready");
-      setPyErr(null);
       run = await runPythonInPyodide(code);
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
-      setPyStatus("err");
-      setPyErr(err);
       setCellState((s) => ({
         ...s,
         [id]: {
@@ -435,30 +414,6 @@ function ChapterPracticeInner({
         {data.chapterIntroHtml
           ? htmlMd(data.chapterIntroHtml, "chapter-intro")
           : null}
-        <div className="jnb-py-box" role="status">
-          {pyStatus === "idle" && (
-            <>
-              点「运行并上报」将自动下载并初始化 Pyodide（首次可能较慢）。也可
-              <button
-                type="button"
-                className="jnb-preload-link"
-                onClick={() => void prewarmPyodide()}
-              >
-                先预载运行环境
-              </button>
-              。
-            </>
-          )}
-          {pyStatus === "loading" && <span>正在预载 Pyodide…</span>}
-          {pyStatus === "ready" && (
-            <span className="jnb-status-ok">Pyodide 已就绪</span>
-          )}
-          {pyStatus === "err" && (
-            <span className="jnb-status-err">
-              Pyodide：{pyErr || "不可用"}
-            </span>
-          )}
-        </div>
         {data.blocks.map((b, bi) => {
           const sec = b.sectionTitle?.trim() || `知识点 ${bi + 1}`;
           const gTitle =
