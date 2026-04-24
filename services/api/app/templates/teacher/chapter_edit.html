@@ -16,6 +16,23 @@
 </div>
 
 <div class="card">
+  <h2 style="margin-top:0">章素材（<code>sourceMaterial</code>）</h2>
+  <p>给「从素材用 LLM 生成」用的说明或原文（纯文本，不是上面的章 JSON）。先点「保存章素材」，再点下面的「从素材用 LLM 生成」。MOCK 模式也会读这段文字（同时可仍返回固定示范草稿）。</p>
+  <form
+    id="fmat"
+    method="post"
+    action="/teacher/chapters/{{ ch.id }}/save-material"
+    hx-post="/teacher/chapters/{{ ch.id }}/save-material"
+    hx-target="#flash"
+    hx-swap="innerHTML"
+  >
+    <label for="sm">素材正文</label>
+    <textarea id="sm" name="source_material" rows="6" placeholder="例如：本课教学目标、引用的课文段落、要出的题型说明…">{{ source_material_text }}</textarea>
+    <p><button type="submit" class="secondary">保存章素材</button></p>
+  </form>
+</div>
+
+<div class="card">
   <h2 style="margin-top:0">草稿 JSON（<code>ai_generated_draft</code>）</h2>
   <p>须符合 <strong>version 1</strong> 章 JSON；可粘贴后保存，再点发布。若 HTMX（外网脚本）未加载，仍可用下面表单的常规提交；成功后会返回本页并显示提示。</p>
   <form
@@ -55,7 +72,7 @@
   </p>
   <p style="color:var(--muted); font-size:0.85rem">
     当前状态：<strong>{{ ch.content_status }}</strong>
-    · 素材在 API 中编辑 <code>sourceMaterial</code> 或使用 mock 生章
+    · 章素材见上方 <code>sourceMaterial</code> 区块；MOCK 生章不调用外网 LLM
   </p>
 </div>
 {% endblock %}
