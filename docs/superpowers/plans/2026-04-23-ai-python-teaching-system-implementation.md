@@ -278,7 +278,7 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 - [x] 加载 **Pyodide**；用 `GET /v1/student/chapters/:id` 的 `publishedContent` **JSON** 渲染**多块**中各 **引导/扩展** cell 与**可编代码**区。
 
-- [x] 点「**运行并上报**」：在浏览器内执行，将 **`runOk`**、stdout/stderr 等 **POST** `/v1/student/cells/verify`（与 §4.2 规则一致；异常时 `runOk: false`）。可选 **预载** Pyodide、**尝试标记本章完成**（任务 8 同接口）。
+- [x] 点「**执行**」：在浏览器内执行并上报 **`runOk`**、stdout/stderr 等 **POST** `/v1/student/cells/verify`（与 §4.2 规则一致；异常时 `runOk: false`）。**尝试标记本章完成**（任务 8 同接口）。
 
 - [x] **提交**
 

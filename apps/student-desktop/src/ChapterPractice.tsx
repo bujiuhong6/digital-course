@@ -184,7 +184,7 @@ function MessageBar({
     return (
       <div className="jnb-msg jnb-msg--warn" role="status">
         <div className="jnb-msg-label">本题</div>
-        <div className="jnb-msg-body">未做对：程序能运行，但输出与题目要求不符。上方为本次运行结果；可对照下方过关说明与标准答案参考修改，再点「运行并上报」。
+        <div className="jnb-msg-body">未做对：程序能运行，但输出与题目要求不符。上方为本次运行结果；可对照下方判定标准与标准答案参考修改，再点「执行」。
         </div>
       </div>
     );
@@ -472,8 +472,8 @@ function ChapterPracticeInner({
                   disabled={cellState[b.guideCell.id]?.loading}
                 >
                   {cellState[b.guideCell.id]?.loading
-                    ? "运行中…"
-                    : "运行并上报"}
+                    ? "执行中…"
+                    : "执行"}
                 </button>
               </div>
               {cellState[b.guideCell.id]?.loading &&
@@ -540,8 +540,8 @@ function ChapterPracticeInner({
                   disabled={cellState[b.extensionCell.id]?.loading}
                 >
                   {cellState[b.extensionCell.id]?.loading
-                    ? "运行中…"
-                    : "运行并上报"}
+                    ? "执行中…"
+                    : "执行"}
                 </button>
               </div>
               {cellState[b.extensionCell.id]?.loading &&

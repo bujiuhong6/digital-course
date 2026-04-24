@@ -43,7 +43,7 @@ async function main() {
   await s.getByText(/认识 print/, { exact: false }).first().waitFor({ timeout: 20_000 });
   await w(1500);
   await s.locator("textarea.jnb-input").first().fill("print('wrong')");
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s
     .getByText("未做对", { exact: false })
     .first()
@@ -51,14 +51,14 @@ async function main() {
   await s.getByText("运行结果", { exact: false }).first().waitFor();
   await w(3000);
   await s.locator("textarea.jnb-input").first().fill("print(");
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s
     .getByText("代码存在错误", { exact: false })
     .first()
     .waitFor({ timeout: 120_000 });
   await w(3000);
   await s.locator("textarea.jnb-input").first().fill('print("all ok now")');
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s
     .getByText("此题已答对", { exact: false })
     .first()

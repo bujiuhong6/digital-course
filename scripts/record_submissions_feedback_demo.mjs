@@ -43,13 +43,13 @@ async function main() {
   await w(1000);
   // 逻辑错误：能运行但不满足
   await s.locator("textarea.jnb-input").nth(0).fill("print('nope')");
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s.getByText("未做对", { exact: false }).first().waitFor({ timeout: 120_000 });
   await s.getByText("标准答案参考", { exact: false }).first().waitFor();
   await w(3000);
   // 语法错
   await s.locator("textarea.jnb-input").nth(0).fill("print(");
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s
     .getByText("代码存在错误", { exact: false })
     .first()
@@ -57,7 +57,7 @@ async function main() {
   await w(3000);
   // 通过
   await s.locator("textarea.jnb-input").nth(0).fill('print("all ok now")');
-  await s.getByRole("button", { name: "运行并上报" }).nth(0).click();
+  await s.getByRole("button", { name: "执行" }).nth(0).click();
   await s
     .getByText("此题已答对", { exact: false })
     .first()
