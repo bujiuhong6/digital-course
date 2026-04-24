@@ -75,4 +75,18 @@
     · 章素材见上方 <code>sourceMaterial</code> 区块；MOCK 生章不调用外网 LLM
   </p>
 </div>
+
+{% if published_json %}
+<div class="card">
+  <h2 style="margin-top:0">已发布内容（<code>publishedContent</code>，只读）</h2>
+  <p>与学生端 <code>GET /v1/student/chapters/{id}</code> 中收到的正文一致。若要改版面，请改下方草稿后<strong>再次发布</strong>（会覆盖学生可见内容）。</p>
+  <label for="pubro">学生可见章 JSON</label>
+  <textarea id="pubro" readonly rows="20" class="ro">{{ published_json }}</textarea>
+</div>
+{% elif ch.content_status == 'published' %}
+<div class="card">
+  <h2 style="margin-top:0">已发布内容</h2>
+  <p class="flash-err">状态为已发布，但库中无 <code>publishedContent</code> 记录（异常，请用 API 或联系维护）。</p>
+</div>
+{% endif %}
 {% endblock %}

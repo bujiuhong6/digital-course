@@ -259,6 +259,11 @@ async def page_chapter_edit(
         if ch.ai_generated_draft is not None
         else json.dumps(sample_published_v1(), ensure_ascii=False, indent=2)
     )
+    published_json: str | None = None
+    if ch.published_content is not None:
+        published_json = json.dumps(
+            ch.published_content, ensure_ascii=False, indent=2
+        )
     qp = request.query_params
     ui_flash: str | None = None
     ui_flash_level: str | None = None
@@ -283,6 +288,7 @@ async def page_chapter_edit(
             "ch": ch,
             "draft_json": draft_json,
             "source_material_text": ch.source_material or "",
+            "published_json": published_json,
             "ui_flash": ui_flash,
             "ui_flash_level": ui_flash_level,
         },
