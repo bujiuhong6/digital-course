@@ -452,7 +452,7 @@ function ChapterPracticeInner({
                 </div>
               </div>
               <p className="jnb-pass">
-                过关：模式 <code>{b.guideCell.passRule?.mode}</code>
+                判定标准：模式 <code>{b.guideCell.passRule?.mode}</code>
                 {b.guideCell.passRule?.expectedSubstring ? (
                   <>
                     ，stdout 须含{" "}
@@ -518,7 +518,7 @@ function ChapterPracticeInner({
                 </div>
               </div>
               <p className="jnb-pass">
-                过关：模式 <code>{b.extensionCell.passRule?.mode}</code>
+                判定标准：模式 <code>{b.extensionCell.passRule?.mode}</code>
                 {b.extensionCell.passRule?.expectedSubstring ? (
                   <>
                     ，stdout 须含{" "}

@@ -115,7 +115,7 @@
       </div>
       {% endif %}
       {% set gpr = g.get('passRule') or {} %}
-      <p class="jnb-pass">过关：模式 <code>{{ gpr.get('mode', '') }}</code>
+      <p class="jnb-pass">判定标准：模式 <code>{{ gpr.get('mode', '') }}</code>
         {% if gpr.get('expectedSubstring') %}，stdout 须含 <code>{{ gpr.get('expectedSubstring') }}</code>{% endif %}
         {% if gpr.get('assertCode') %}，断言 <code>{{ gpr.get('assertCode', '')[:200] }}{% if (gpr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
       </p>
@@ -141,7 +141,7 @@
       </div>
       {% endif %}
       {% set epr = ex.get('passRule') or {} %}
-      <p class="jnb-pass">过关：模式 <code>{{ epr.get('mode', '') }}</code>
+      <p class="jnb-pass">判定标准：模式 <code>{{ epr.get('mode', '') }}</code>
         {% if epr.get('expectedSubstring') %}，stdout 须含 <code>{{ epr.get('expectedSubstring') }}</code>{% endif %}
         {% if epr.get('assertCode') %}，断言 <code>{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
       </p>
