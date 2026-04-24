@@ -238,13 +238,23 @@ git commit -m "chore: scaffold FastAPI with SQLite volume"
 
 **文件（与设计一致）：** **FastAPI** 同仓内 `app/templates/` + `Jinja2` + **HTMX** 路由；**不**为教师端单独开 **Vite+React** 仓库，除非你后续要拆**可视化**章编辑器再评估。
 
-- [ ] 登录页 → 调 `POST /v1/admin/login`；**HTMX** 局部刷新或整页**皆可**；**同域** 无需**跨源** **CORS**（学生 **Tauri** 仍用**配置**的 **API** 基址）。
+- [x] 登录页 → 调 `POST /v1/admin/login`；**HTMX** 局部刷新或整页**皆可**；**同域** 无需**跨源** **CORS**（学生 **Tauri** 仍用**配置**的 **API** 基址）。
 
-- [ ] 名单**导入表单**、章**编辑**（MVP 可用**大** **textarea** 直接贴 **JSON**）。
+- [x] 名单**导入表单**、章**编辑**（MVP 可用**大** **textarea** 直接贴 **JSON**）。
 
-- [ ] 手工**走一遍**联调清单（可写在**本计划末尾**自列表）。
+- [x] 手工**走一遍**联调清单（可写在**本计划末尾**自列表）。
 
-- [ ] **提交**
+- [x] **提交**
+
+**联调清单（MVP 教师 Web，路径 `/teacher`）**
+
+1. `GET /health` 返回 `ok`；浏览器打开 `http://127.0.0.1:8000/teacher/login`。
+2. 未 bootstrap：首次表单 `POST /teacher/bootstrap` 或先 `POST /v1/admin/bootstrap`。
+3. 登录页 `POST /teacher/do-login` 或 `POST /v1/admin/login` 后，访问 `/teacher` 见**章列表**、**新建章**。
+4. `GET /teacher/roster` 上传 **CSV/JSON** 名单，列表刷新成功提示。
+5. 进入**章编辑**：大文本框**保存 JSON 草稿**、**生成**、**发布**；发布后学生端可 `GET /v1/student/chapters` 看到已发布项。
+6. 可选：`POST /v1/student/cells/verify` 与 `/chapters/.../complete` 与任务 8 一致。
+7. 说明：HTMX 自 CDN 加载，离线环境需自托管 `htmx.min.js` 或改模板引用。
 
 ---
 
