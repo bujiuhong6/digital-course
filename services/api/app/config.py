@@ -86,6 +86,12 @@ class Settings(BaseSettings):
         description="发向 openrouter.ai 时可选的 X-OpenRouter-Title。",
         validation_alias=AliasChoices("OPENROUTER_TITLE",),
     )
+    # 开发时学生 Vite 可能为 1420/5173 等任意端口；为 true 时 CORS 允许 localhost/127.0.0.1 任意端口
+    cors_dev_localhost_regex: bool = Field(
+        default=True,
+        description="为 True 时匹配 localhost/127.0.0.1/tauri.localhost 的跨域来源。",
+        validation_alias=AliasChoices("CORS_DEV_LOCALHOST_REGEX",),
+    )
 
     @field_validator("llm_base_url", "chat_llm_base_url", mode="before")
     @classmethod
