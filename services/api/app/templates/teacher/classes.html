@@ -28,10 +28,15 @@
   {% if not classes %}
   <p>暂无。请先新建。</p>
   {% else %}
-  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/roster">名单</a>」页将已注册学生分配到班级。</p>
-  <ul style="margin:0;padding-left:1.2rem">
+  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/roster">名单</a>」页将已注册学生分配到班级。点击下方班级可查看本班名单与导出练习完成情况。</p>
+  <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0.5rem">
     {% for c in classes %}
-    <li><strong>{{ c.name }}</strong> <code style="color:var(--muted)">{{ c.id }}</code></li>
+    <li>
+      <a class="btn secondary" href="/teacher/classes/{{ c.id }}" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none;width:100%;max-width:40rem;justify-content:space-between;box-sizing:border-box">
+        <span><strong>{{ c.name }}</strong></span>
+        <code style="color:var(--muted);font-size:0.78rem">{{ c.id }}</code>
+      </a>
+    </li>
     {% endfor %}
   </ul>
   {% endif %}
