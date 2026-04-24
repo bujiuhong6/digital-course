@@ -28,7 +28,17 @@
         <td><a href="/teacher/chapters/{{ c.id }}/edit">{{ c.title }}</a></td>
         <td><code>{{ c.slug }}</code></td>
         <td>{{ c.content_status }}</td>
-        <td><a href="/teacher/chapters/{{ c.id }}/edit">编辑 / 发布</a></td>
+        <td class="row-actions">
+          <a href="/teacher/chapters/{{ c.id }}/edit">编辑</a>
+          {% if c.content_status == 'published' %}
+          <span class="muted">· 已发布</span>
+          {% else %}
+          <span class="muted">· 草稿</span>
+          {% endif %}
+          <form method="post" action="/teacher/chapters/{{ c.id }}/delete" style="display:inline;margin:0" onsubmit="return confirm('确定删除此章？学生端将不可见；与章相关的练习记录会一并删除。');">
+            <button type="submit" class="link-danger" title="删除章">删除</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

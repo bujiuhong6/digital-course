@@ -24,6 +24,35 @@ def test_teacher_web_form_login_sets_cookie_on_redirect_response(client) -> None
     assert "章" in dash.text
 
 
+def test_teacher_delete_chapter_from_dashboard_post(client) -> None:
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"password": "del-dash-pw-02"},
+    )
+    r = client.post(
+        "/teacher/chapters/new",
+        data={"title": "可删之章"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    loc = r.headers.get("location", "")
+    # /teacher/chapters/{uuid}/edit
+    from uuid import UUID
+
+    part = loc.split("/chapters/")[1]
+    chapter_id = part.split("/edit")[0]
+    _ = UUID(chapter_id)
+    d = client.post(
+        f"/teacher/chapters/{chapter_id}/delete",
+        follow_redirects=False,
+    )
+    assert d.status_code == 303
+    assert d.headers.get("location", "").endswith("/teacher")
+    p = client.get("/teacher", follow_redirects=True)
+    assert p.status_code == 200
+    assert "可删之章" not in p.text
+
+
 def test_chapter_save_draft_full_page_redirects_without_htmx(client) -> None:
     """无 HTMX 时须能用普通 POST+action 保存（不依赖外网 htmx.js）。"""
     client.post(
