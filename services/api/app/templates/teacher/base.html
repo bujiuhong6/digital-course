@@ -4,7 +4,8 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>{% block title %}教师{% endblock %} — Teaching</title>
-  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+  {# HTMX 仅在需要局部刷新的页面加载，避免登录等普通 POST 被脚本干扰 #}
+  {% block head %}{% endblock %}
   <style>
     :root { --bg: #0f1419; --card: #1a2332; --text: #e7ecf3; --muted: #8b9cb3; --accent: #3b82f6; }
     * { box-sizing: border-box; }
@@ -29,7 +30,6 @@
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #2d3a4d; }
   </style>
-  {% block head %}{% endblock %}
 </head>
 <body>
   <div class="wrap">
