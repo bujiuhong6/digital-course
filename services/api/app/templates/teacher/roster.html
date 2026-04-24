@@ -10,7 +10,7 @@
 </div>
 
 <div class="card">
-  <p>上传 <strong>CSV</strong> 或 <strong>JSON</strong>（UTF-8），表头或字段含 <code>studentNo</code>、<code>fullName</code> 或中文「学号」「姓名」。</p>
+  <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头两列名为 <strong>学号</strong>、<strong>姓名</strong>。</p>
   <form
     hx-post="/teacher/roster/import"
     hx-encoding="multipart/form-data"
@@ -18,7 +18,7 @@
     hx-swap="innerHTML"
   >
     <label for="f">选择文件</label>
-    <input id="f" name="file" type="file" required accept=".csv,.json,text/csv,application/json"/>
+    <input id="f" name="file" type="file" required accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
     <p><button type="submit">导入</button></p>
   </form>
   <div id="roster-result"></div>
