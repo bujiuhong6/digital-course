@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx
 
-from ..config import settings
+from ..config import normalize_openai_compat_base_url, settings
 from .chapter_json import sample_published_v1
 
 _PROMPT_PATH = (
@@ -62,7 +62,7 @@ async def generate_chapter_draft(
         s = json.dumps(d, ensure_ascii=False)
         return d, s, None
 
-    base = (settings.llm_base_url or "").strip().rstrip("/")
+    base = normalize_openai_compat_base_url(settings.llm_base_url)
     if not base:
         return (
             None,
