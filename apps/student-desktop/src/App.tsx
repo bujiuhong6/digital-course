@@ -139,7 +139,7 @@ function App() {
   return (
     <main className={`sd-root${screen === "chapter" ? " sd-wide" : ""}`}>
       <header className="sd-header">
-        <h1>学生端（Tauri）</h1>
+        <h1>章节练习（学生用）</h1>
         <p className="sd-meta">
           API: <code>{API_BASE}</code>（<code>VITE_API_BASE_URL</code>）
         </p>
