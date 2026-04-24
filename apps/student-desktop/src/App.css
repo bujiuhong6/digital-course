@@ -1,3 +1,17 @@
+/* 与 .sd-root 同色，避免 body/html 默认浅色在宽屏两侧露出 */
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: #0f1419;
+  color: #e7ecf3;
+}
+
+#root {
+  min-height: 100vh;
+}
+
 .sd-root {
   max-width: 42rem;
   margin: 0 auto;
@@ -6,6 +20,7 @@
   background: #0f1419;
   color: #e7ecf3;
   font-family: system-ui, sans-serif;
+  box-sizing: border-box;
 }
 
 .sd-root.sd-wide {
