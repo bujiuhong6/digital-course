@@ -274,15 +274,48 @@ async def page_chapter_edit(
         ui_flash, ui_flash_level = "已发布。", "ok"
     elif qp.get("pub_err") == "1":
         ui_flash, ui_flash_level = "发布未成功。请检查草稿或「发布」校验信息。", "error"
+    elif qp.get("material_saved") == "1":
+        ui_flash, ui_flash_level = "章素材已保存。", "ok"
     return templates.TemplateResponse(
         request,
         "teacher/chapter_edit.html",
         {
             "ch": ch,
             "draft_json": draft_json,
+            "source_material_text": ch.source_material or "",
             "ui_flash": ui_flash,
             "ui_flash_level": ui_flash_level,
         },
+    )
+
+
+@router.post("/chapters/{chapter_id}/save-material", response_class=HTMLResponse)
+async def ui_save_source_material(
+    request: Request,
+    db: DBSession,
+    chapter_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+    source_material: str = Form(""),
+):
+    """教师 Web：保存 `sourceMaterial`（给「从素材用 LLM 生成」用）。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    ch = r.scalar_one_or_none()
+    if ch is None:
+        return HTMLResponse("章不存在", status_code=404)
+    ch.source_material = source_material if source_material.strip() else None
+    ch.updated_at = datetime.now(timezone.utc)
+    htmx = _wants_htmx(request)
+    if htmx:
+        return templates.TemplateResponse(
+            request,
+            "teacher/partials/flash.html",
+            {"level": "ok", "message": "章素材已保存。可点「从素材用 LLM 生成」。"},
+        )
+    return RedirectResponse(
+        url=f"/teacher/chapters/{chapter_id}/edit?material_saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
