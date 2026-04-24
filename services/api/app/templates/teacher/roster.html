@@ -36,7 +36,7 @@
       <tr>
         <td>{{ r.student_no }}</td>
         <td>{{ r.full_name }}</td>
-        <td>{{ r.status }}</td>
+        <td>{% if r.status == "bound" %}已注册{% else %}未注册{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
