@@ -80,6 +80,10 @@
             </select>
             <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">保存</button>
           </form>
+          <form method="post" action="/teacher/students/{{ st.id }}/remove-from-class" style="display:inline-block;margin:0.35rem 0 0 0" onsubmit="return confirm('确定将该学生移出本班？学生将回到「名单」页的未分班名单。');">
+            <input type="hidden" name="from_class_id" value="{{ cl.id }}" />
+            <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">移除班级</button>
+          </form>
         </td>
       </tr>
       {% endfor %}

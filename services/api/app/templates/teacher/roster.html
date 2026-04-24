@@ -35,6 +35,7 @@
 
 <div class="card">
   <h2 style="margin-top:0">当前名单行</h2>
+  <p style="color:var(--muted);font-size:0.9rem">仅显示<strong>未分班</strong>的名单行。已分入某班后请在「<a href="/teacher/classes">班级</a>」对应班级页查看与调整。</p>
   {% if not rows %}
   <p>暂无记录。</p>
   {% else %}
@@ -56,7 +57,7 @@
 
 <div class="card">
   <h2 style="margin-top:0">已注册学生与班级</h2>
-  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/classes">班级</a>」页新建班级后，在此为学生选择班级。完成记录可按班级过滤。</p>
+  <p style="color:var(--muted);font-size:0.9rem">仅显示<strong>未分班</strong>的已注册学生。在「<a href="/teacher/classes">班级</a>」页新建班级后，在此为学生设班。已分入某班后请到该班详情页或名单导入调整；完成记录可按班级过滤。</p>
   {% if not reg_students %}
   <p>尚无已注册学生。</p>
   {% else %}

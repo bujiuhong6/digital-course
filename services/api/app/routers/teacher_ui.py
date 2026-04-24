@@ -388,6 +388,11 @@ async def ui_set_student_class(
         if c is None:
             return RedirectResponse(url="/teacher/roster?err=class", status_code=303)
         st.class_id = c.id
+    re_row = (
+        await db.execute(select(RosterEntry).where(RosterEntry.student_no == st.student_no))
+    ).scalar_one_or_none()
+    if re_row is not None and re_row.deleted_at is None:
+        re_row.class_id = st.class_id
     if (return_to or "").strip() == "class":
         target: uuid.UUID | None = st.class_id
         raw = (return_class_id or "").strip()
@@ -401,6 +406,47 @@ async def ui_set_student_class(
                 url=f"/teacher/classes/{target}?saved=1",
                 status_code=status.HTTP_303_SEE_OTHER,
             )
+    return RedirectResponse(
+        url="/teacher/roster?saved=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/students/{student_id}/remove-from-class", response_class=HTMLResponse)
+async def ui_remove_student_from_class(
+    db: DBSession,
+    student_id: uuid.UUID,
+    from_class_id: str = Form(""),
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """
+    将学生从班级移出：清空 `students.class_id` 与同学号 `roster_entries.class_id`，
+    学生回到「名单」的当前名单行（未分班）。
+    """
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    st = (
+        await db.execute(select(Student).where(Student.id == student_id))
+    ).scalar_one_or_none()
+    if st is None:
+        return HTMLResponse("学生不存在", status_code=404)
+    st.class_id = None
+    e_r = await db.execute(
+        select(RosterEntry).where(RosterEntry.student_no == st.student_no)
+    )
+    re = e_r.scalar_one_or_none()
+    if re is not None and re.deleted_at is None:
+        re.class_id = None
+    raw = (from_class_id or "").strip()
+    try:
+        u = uuid.UUID(raw) if raw else None
+    except ValueError:
+        u = None
+    if u is not None:
+        return RedirectResponse(
+            url=f"/teacher/classes/{u}?saved=1",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     return RedirectResponse(
         url="/teacher/roster?saved=1",
         status_code=status.HTTP_303_SEE_OTHER,
@@ -531,7 +577,10 @@ async def page_roster(
     r = await db.execute(
         select(RosterEntry)
         .options(selectinload(RosterEntry.class_))
-        .where(RosterEntry.deleted_at.is_(None))
+        .where(
+            RosterEntry.deleted_at.is_(None),
+            RosterEntry.class_id.is_(None),
+        )
         .order_by(RosterEntry.student_no)
     )
     rows = r.scalars().all()
@@ -542,6 +591,7 @@ async def page_roster(
     r_stu = await db.execute(
         select(Student, ClassModel)
         .outerjoin(ClassModel, Student.class_id == ClassModel.id)
+        .where(Student.class_id.is_(None))
         .order_by(Student.student_no)
     )
     student_rows = r_stu.all()
