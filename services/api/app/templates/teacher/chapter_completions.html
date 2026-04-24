@@ -2,8 +2,8 @@
 {% block title %}{{ ch.title }} — 完成记录{% endblock %}
 {% block body %}
 <div class="bar">
-  <h1 style="margin:0">完成记录</h1>
-  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+  <h1>完成记录</h1>
+  <div class="bar-actions">
     <span style="color:var(--muted)">{{ ch.title }} <code>{{ ch.slug }}</code></span>
     <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/edit">编辑章</a>
     <a class="btn secondary" href="/teacher">返回列表</a>
