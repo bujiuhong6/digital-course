@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiJson, clearToken, getToken, setToken } from "./api";
 import { ChapterPractice } from "./ChapterPractice";
+import { hasMeaningfulCodeDraft } from "./chapterDraftStorage";
 import "./App.css";
 
 type Screen = "auth" | "chapters" | "chapter";
@@ -26,6 +27,23 @@ function practiceStatusLabel(s: PracticeStatus): string {
   return "待完成";
 }
 
+function mergePracticeStatusForList(
+  server: PracticeStatus,
+  chapterId: string,
+  studentId: string | null,
+): PracticeStatus {
+  if (server === "submitted" || !studentId) {
+    return server;
+  }
+  if (server === "inProgress") {
+    return "inProgress";
+  }
+  if (hasMeaningfulCodeDraft(studentId, chapterId)) {
+    return "inProgress";
+  }
+  return "pending";
+}
+
 type ChapterBody = {
   id: string;
   slug: string;
@@ -48,11 +66,16 @@ function App() {
   const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [selected, setSelected] = useState<ChapterBody | null>(null);
   const [loading, setLoading] = useState(false);
+  const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
 
   const goChapters = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
+      const me = await apiJson<{
+        student: { studentId: string; studentNo: string; fullName: string };
+      }>("/v1/student/me");
+      setCurrentStudentId(me.student.studentId);
       const data = await apiJson<{ chapters: ChapterListItem[] }>("/v1/student/chapters");
       setChapters(data.chapters);
       setScreen("chapters");
@@ -77,12 +100,17 @@ function App() {
     try {
       const data = await apiJson<{
         accessToken: string;
-        student: { studentNo: string; fullName: string };
+        student: {
+          studentId: string;
+          studentNo: string;
+          fullName: string;
+        };
       }>("/v1/student/login", {
         method: "POST",
         body: JSON.stringify({ studentNo, password }),
       });
       setToken(data.accessToken);
+      setCurrentStudentId(data.student.studentId);
       await goChapters();
     } catch (e) {
       setErr(String(e));
@@ -102,7 +130,7 @@ function App() {
       return;
     }
     try {
-      await apiJson<{ ok: boolean; studentId: string }>(
+      const reg = await apiJson<{ ok: boolean; studentId: string }>(
         "/v1/student/register",
         {
           method: "POST",
@@ -114,6 +142,7 @@ function App() {
         },
         { noAuth: true },
       );
+      setCurrentStudentId(reg.studentId);
       setPassword("");
       setPassword2("");
       setOkHint("注册成功。请用刚才的学号与密码登录。");
@@ -127,6 +156,7 @@ function App() {
 
   function onLogout() {
     clearToken();
+    setCurrentStudentId(null);
     setChapters([]);
     setSelected(null);
     setScreen("auth");
@@ -287,10 +317,20 @@ function App() {
                     className="sd-list-status"
                     title="本章练习进度"
                     aria-label={`本章练习状态：${practiceStatusLabel(
-                      c.practiceStatus,
+                      mergePracticeStatusForList(
+                        c.practiceStatus,
+                        c.chapterId,
+                        currentStudentId,
+                      ),
                     )}`}
                   >
-                    {practiceStatusLabel(c.practiceStatus)}
+                    {practiceStatusLabel(
+                      mergePracticeStatusForList(
+                        c.practiceStatus,
+                        c.chapterId,
+                        currentStudentId,
+                      ),
+                    )}
                   </span>
                 </li>
               ))}
@@ -312,12 +352,15 @@ function App() {
           >
             ← 返回列表
           </button>
-          {selected.publishedContent ? (
+          {selected.publishedContent && currentStudentId ? (
             <ChapterPractice
+              studentId={currentStudentId}
               chapterId={selected.id}
               title={selected.title}
               publishedContent={selected.publishedContent}
             />
+          ) : selected.publishedContent ? (
+            <p className="sd-muted">正在加载学生信息…</p>
           ) : (
             <>
               <h2>{selected.title}</h2>

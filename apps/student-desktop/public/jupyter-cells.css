@@ -462,6 +462,12 @@ pre.jnb-input-ro {
   padding-top: 1.25rem;
   border-top: 1px solid var(--jnb-border);
 }
+.jnb-footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
 .jnb-footer-actions button {
   background: #1e40af;
   color: #fff;
@@ -472,8 +478,24 @@ pre.jnb-input-ro {
   font-weight: 500;
   cursor: pointer;
 }
-.jnb-footer-actions button:hover { background: #1d4ed8; }
+.jnb-footer-actions button.jnb-btn-secondary {
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #cbd5e1;
+}
+.jnb-footer-actions button.jnb-btn-secondary:hover {
+  background: #e2e8f0;
+}
+.jnb-footer-actions button:not(.jnb-btn-secondary):hover {
+  background: #1d4ed8;
+}
 .jnb-footer-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.jnb-footer-hintline {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--jnb-muted);
+  width: 100%;
+}
 .jnb-footer-msg {
   margin: 0.5rem 0 0;
   font-size: 0.9rem;
