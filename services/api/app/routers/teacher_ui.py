@@ -8,7 +8,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Cookie, File, Form, Request, Response, UploadFile, status
+from fastapi import APIRouter, Cookie, File, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, update
@@ -56,11 +56,10 @@ async def page_login(
     )
 
 
-@router.post("/bootstrap", response_class=HTMLResponse)
+@router.post("/bootstrap")
 async def post_bootstrap(
     request: Request,
     db: DBSession,
-    response: Response,
     password: str = Form(""),
     bootstrap_token: str = Form(""),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
@@ -90,15 +89,15 @@ async def post_bootstrap(
             },
         )
     db.add(AdminConfig(id=1, password_hash=_pwd.hash(password)))
-    _set_teacher_cookie(response)
-    return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+    redir = RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+    _set_teacher_cookie(redir)
+    return redir
 
 
-@router.post("/do-login", response_class=HTMLResponse)
+@router.post("/do-login")
 async def post_login(
     request: Request,
     db: DBSession,
-    response: Response,
     password: str = Form(""),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
@@ -130,8 +129,9 @@ async def post_login(
     await db.execute(
         update(AdminConfig).where(AdminConfig.id == 1).values(updated_at=func.now())
     )
-    _set_teacher_cookie(response)
-    return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+    redir = RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+    _set_teacher_cookie(redir)
+    return redir
 
 
 @router.get("", response_class=HTMLResponse)
