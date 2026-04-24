@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "./api";
+import { StudentChat } from "./StudentChat";
 import {
   runPythonInPyodide,
   ensurePyodide,
@@ -111,34 +112,22 @@ function RunOutputBlock({ run }: { run: RunResult | null | undefined }) {
   );
 }
 
-export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
+function ChapterPracticeInner({
+  chapterId,
+  title,
+  data,
+}: {
+  chapterId: string;
+  title: string;
+  data: PublishedV1;
+}) {
   const [pyStatus, setPyStatus] = useState<"idle" | "loading" | "ready" | "err">("idle");
   const [pyErr, setPyErr] = useState<string | null>(null);
   const [codeMap, setCodeMap] = useState<Record<string, string>>({});
   const [cellState, setCellState] = useState<Record<string, CellState>>({});
   const [completeMsg, setCompleteMsg] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
-
-  const prewarmPyodide = useCallback(async () => {
-    if (pyStatus === "ready" || pyStatus === "loading") {
-      return;
-    }
-    setPyStatus("loading");
-    setPyErr(null);
-    try {
-      await ensurePyodide();
-      setPyStatus("ready");
-    } catch (e) {
-      setPyStatus("err");
-      setPyErr(String(e));
-    }
-  }, [pyStatus]);
-
-  if (!isPublishedV1(publishedContent)) {
-    return (
-      <p className="sd-muted">本章尚无有效的 publishedContent（需要 version: 1 与 blocks）。</p>
-    );
-  }
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
 
   const setCode = (id: string, v: string) => {
     setCodeMap((m) => ({ ...m, [id]: v }));
@@ -155,6 +144,53 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
     return (cell as GuideCell).starterCode;
   };
 
+  const getCodeByCellId = useCallback(
+    (cellId: string) => {
+      for (const b of data.blocks) {
+        if (b.guideCell.id === cellId) {
+          return getCode("guide", b.guideCell);
+        }
+        if (b.extensionCell.id === cellId) {
+          return getCode("extension", b.extensionCell);
+        }
+      }
+      return "";
+    },
+    [data.blocks, codeMap],
+  );
+
+  const defaultChatCellId = useMemo(
+    () => data.blocks[0]?.guideCell.id ?? null,
+    [data.blocks],
+  );
+
+  useEffect(() => {
+    if (defaultChatCellId && !activeCellId) {
+      setActiveCellId(defaultChatCellId);
+    }
+  }, [defaultChatCellId, activeCellId]);
+
+  const getChatContext = useCallback(() => {
+    const id =
+      activeCellId ?? defaultChatCellId ?? data.blocks[0].guideCell.id;
+    return { cellId: id, currentCode: getCodeByCellId(id) };
+  }, [activeCellId, defaultChatCellId, getCodeByCellId, data.blocks]);
+
+  const prewarmPyodide = useCallback(async () => {
+    if (pyStatus === "ready" || pyStatus === "loading") {
+      return;
+    }
+    setPyStatus("loading");
+    setPyErr(null);
+    try {
+      await ensurePyodide();
+      setPyStatus("ready");
+    } catch (e) {
+      setPyStatus("err");
+      setPyErr(String(e));
+    }
+  }, [pyStatus]);
+
   const runAndVerify = async (kind: CellKind, cell: GuideCell | ExtensionCell) => {
     const id = cell.id;
     setCellState((s) => ({
@@ -167,6 +203,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
       },
     }));
     setCompleteMsg(null);
+    setActiveCellId(id);
     const code = getCode(kind, cell);
     let run: Awaited<ReturnType<typeof runPythonInPyodide>>;
     try {
@@ -300,7 +337,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
             </span>
           )}
         </div>
-        {publishedContent.blocks.map((b, bi) => {
+        {data.blocks.map((b, bi) => {
           const i0 = bi * 3 + 1;
           const iGuide = i0 + 1;
           const iExt = i0 + 2;
@@ -339,6 +376,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
                     className="jnb-input"
                     value={getCode("guide", b.guideCell)}
                     onChange={(e) => setCode(b.guideCell.id, e.target.value)}
+                    onFocus={() => setActiveCellId(b.guideCell.id)}
                     rows={5}
                     spellCheck={false}
                   />
@@ -399,6 +437,7 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
                     className="jnb-input"
                     value={getCode("extension", b.extensionCell)}
                     onChange={(e) => setCode(b.extensionCell.id, e.target.value)}
+                    onFocus={() => setActiveCellId(b.extensionCell.id)}
                     rows={6}
                     spellCheck={false}
                   />
@@ -461,6 +500,22 @@ export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
           </p>
         </div>
       </div>
+      <StudentChat chapterId={chapterId} getContext={getChatContext} />
     </div>
+  );
+}
+
+export function ChapterPractice({ chapterId, title, publishedContent }: Props) {
+  if (!isPublishedV1(publishedContent)) {
+    return (
+      <p className="sd-muted">本章尚无有效的 publishedContent（需要 version: 1 与 blocks）。</p>
+    );
+  }
+  return (
+    <ChapterPracticeInner
+      chapterId={chapterId}
+      title={title}
+      data={publishedContent}
+    />
   );
 }

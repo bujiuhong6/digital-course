@@ -1,0 +1,39 @@
+{% extends "teacher/base.html" %}
+{% block title %}{{ ch.title }} — 完成记录{% endblock %}
+{% block body %}
+<div class="bar">
+  <h1 style="margin:0">完成记录</h1>
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+    <span style="color:var(--muted)">{{ ch.title }} <code>{{ ch.slug }}</code></span>
+    <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/edit">编辑章</a>
+    <a class="btn secondary" href="/teacher">返回列表</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">学生提交（标记本章完成）</h2>
+  <p style="color:var(--muted);font-size:0.9rem">仅当学生在本章所有必做 cell 服务端记录为「通过」后，才能标记完成；下列时间为学生点击「尝试标记本章完成」成功的时间。</p>
+  {% if not completions %}
+  <p>暂无记录。</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>学号</th>
+        <th>姓名</th>
+        <th>完成时间（UTC）</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in completions %}
+      <tr>
+        <td><code>{{ row.student_no }}</code></td>
+        <td>{{ row.full_name }}</td>
+        <td>{{ row.completed_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

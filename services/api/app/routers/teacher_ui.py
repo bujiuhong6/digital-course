@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, update
 
 from ..config import settings
-from ..db.models import AdminConfig, Chapter, RosterEntry
+from ..db.models import AdminConfig, Chapter, ChapterCompletion, RosterEntry, Student
 from ..deps import DBSession, require_bootstrap_token, teacher_cookie_valid
 from ..services.chapter_gen import generate_chapter_draft
 from ..services.chapter_json import validate_for_publish, sample_published_v1
@@ -197,6 +197,42 @@ async def ui_chapter_delete(
         return HTMLResponse("章不存在", status_code=404)
     await db.delete(ch)
     return RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/chapters/{chapter_id}/completions", response_class=HTMLResponse)
+async def page_chapter_completions(
+    request: Request,
+    db: DBSession,
+    chapter_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """学生「标记本章完成」后的提交记录（按章）。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
+    ch = r.scalar_one_or_none()
+    if ch is None:
+        return HTMLResponse("章不存在", status_code=404)
+    r2 = await db.execute(
+        select(ChapterCompletion, Student)
+        .join(Student, Student.id == ChapterCompletion.student_id)
+        .where(ChapterCompletion.chapter_id == chapter_id)
+        .order_by(ChapterCompletion.completed_at.desc())
+    )
+    rows = r2.all()
+    completions = [
+        {
+            "student_no": st.student_no,
+            "full_name": st.full_name,
+            "completed_at": cc.completed_at,
+        }
+        for cc, st in rows
+    ]
+    return templates.TemplateResponse(
+        request,
+        "teacher/chapter_completions.html",
+        {"ch": ch, "completions": completions},
+    )
 
 
 @router.get("/roster", response_class=HTMLResponse)
