@@ -4,7 +4,7 @@
 登录与 bootstrap 成功后会 **Set-Cookie: teacher_session=...**（HMAC-SHA256 签名，见 `app.services.teacher_session`）。
 
 名单 `POST /v1/admin/roster/import` 支持 `multipart` 上传文件（`file` 字段，**.csv、.xlsx 或 .json**）或
-`Content-Type: application/json` 的 `{"rows":[{"studentNo","fullName"},...]}`。表格需第一行表头；**CSV / xlsx** 为 **学号**、**姓名** 两列（UTF-8）。
+`Content-Type: application/json`。**CSV / xlsx** 首行表头须含 **学号**、**姓名**、**班级**（UTF-8）；**JSON** 可为 `rows[].studentNo/fullName/className`（`className` 可选，另支持别名字段 `班级`）。
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, update
 
 from ..config import settings
-from ..db.models import AdminAudit, AdminConfig, RosterEntry, Student
+from ..db.models import AdminAudit, AdminConfig, Class, RosterEntry, Student
 from ..deps import CurrentTeacher, DBSession, require_bootstrap_token
 from ..services.crypto import decrypt_password
 from ..services.teacher_session import create_teacher_session_value
@@ -122,6 +122,12 @@ class RosterItem(BaseModel):
     full_name: str = Field(
         max_length=255, description="姓名，首登须与名单完全对照", alias="fullName"
     )
+    class_name: str | None = Field(
+        default=None,
+        max_length=128,
+        description="班级名称；可空",
+        validation_alias=AliasChoices("className", "班级"),
+    )
 
 
 class RosterJsonBody(BaseModel):
@@ -130,39 +136,47 @@ class RosterJsonBody(BaseModel):
     rows: list[RosterItem]
 
 
-def _iter_csv_rows(data: str) -> Iterator[tuple[str, str]]:
+def _iter_csv_rows(data: str) -> Iterator[tuple[str, str, str | None]]:
     f = io.StringIO(data)
     r = csv.DictReader(f)
     if not r.fieldnames:
         return
     fieldnames = [h.strip() for h in (r.fieldnames or []) if h and h.strip()]
-    if "学号" not in fieldnames or "姓名" not in fieldnames:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="csv_headers_missing: 表头需含列「学号」与「姓名」",
-        )
-    no_key, name_key = "学号", "姓名"
+    for need in ("学号", "姓名", "班级"):
+        if need not in fieldnames:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="csv_headers_missing: 表头需含列「学号」「姓名」「班级」",
+            )
     for row in r:
-        a = (row.get(no_key) or "").strip()
-        b = (row.get(name_key) or "").strip()
+        a = (row.get("学号") or "").strip()
+        b = (row.get("姓名") or "").strip()
+        c = (row.get("班级") or "").strip() or None
         if not a and not b:
             continue
         if not a or not b:
             continue
-        yield a, b
+        yield a, b, c
 
 
-def _rows_from_json_raw(raw: object) -> list[tuple[str, str]]:
+def _rows_from_json_raw(raw: object) -> list[tuple[str, str, str | None]]:
     if isinstance(raw, list):
         items = [RosterItem.model_validate(x) for x in raw]
     else:
         body = RosterJsonBody.model_validate(raw)
         items = body.rows
-    return [(i.student_no.strip(), i.full_name.strip()) for i in items]
+    return [
+        (
+            i.student_no.strip(),
+            i.full_name.strip(),
+            (i.class_name.strip() if (i.class_name or "").strip() else None),
+        )
+        for i in items
+    ]
 
 
-def _load_rows_xlsx(content: bytes) -> list[tuple[str, str]]:
-    """首行表头须含列名 **学号**、**姓名**（严格匹配，去首尾空格）。"""
+def _load_rows_xlsx(content: bytes) -> list[tuple[str, str, str | None]]:
+    """首行表头须含列名 **学号**、**姓名**、**班级**（列名去首尾空格）。"""
     try:
         from openpyxl import load_workbook
     except ImportError as e:  # pragma: no cover
@@ -185,37 +199,38 @@ def _load_rows_xlsx(content: bytes) -> list[tuple[str, str]]:
             return str(v).strip()
 
         hlist = [cell_str(c) for c in header]
-        try:
-            i_no = hlist.index("学号")
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="xlsx_headers_missing: 首行表头需含列「学号」",
-            ) from e
-        try:
-            i_name = hlist.index("姓名")
-        except ValueError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="xlsx_headers_missing: 首行表头需含列「姓名」",
-            ) from e
-        out: list[tuple[str, str]] = []
+        for label, err in (
+            ("学号", "学号"),
+            ("姓名", "姓名"),
+            ("班级", "班级"),
+        ):
+            if label not in hlist:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"xlsx_headers_missing: 首行表头需含列「{err}」",
+                )
+        i_no = hlist.index("学号")
+        i_name = hlist.index("姓名")
+        i_class = hlist.index("班级")
+        out: list[tuple[str, str, str | None]] = []
         for row in it:
             if row is None:
                 continue
             a = cell_str(row[i_no]) if i_no < len(row) else ""
             b = cell_str(row[i_name]) if i_name < len(row) else ""
+            c_raw = cell_str(row[i_class]) if i_class < len(row) else ""
+            c = c_raw or None
             if not a and not b:
                 continue
             if not a or not b:
                 continue
-            out.append((a, b))
+            out.append((a, b, c))
         return out
     finally:
         wb.close()
 
 
-def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str]]:
+def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str, str | None]]:
     name = (filename or "").lower()
     if name.endswith(".xlsx"):
         return _load_rows_xlsx(content)
@@ -234,7 +249,25 @@ def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str]]
     return list(_iter_csv_rows(text))
 
 
-async def _upsert_roster_row(db, student_no: str, full_name: str) -> None:
+async def _get_or_create_class_id(
+    db: DBSession, class_name: str | None
+) -> uuid.UUID | None:
+    if not (class_name or "").strip():
+        return None
+    name = (class_name or "").strip()[:128]
+    r = await db.execute(select(Class).where(Class.name == name))
+    ex = r.scalar_one_or_none()
+    if ex is not None:
+        return ex.id
+    c = Class(name=name)
+    db.add(c)
+    await db.flush()
+    return c.id
+
+
+async def _upsert_roster_row(
+    db: DBSession, student_no: str, full_name: str, class_id: uuid.UUID | None
+) -> None:
     st_r = await db.execute(select(Student).where(Student.student_no == student_no))
     student = st_r.scalar_one_or_none()
     e_r = await db.execute(
@@ -249,15 +282,21 @@ async def _upsert_roster_row(db, student_no: str, full_name: str) -> None:
                 status="bound" if student is not None else "pending",
                 deleted_at=None,
                 student_id=student.id if student is not None else None,
+                class_id=class_id,
             )
         )
+        if student is not None and class_id is not None:
+            student.class_id = class_id
         return
     if entry.deleted_at is not None:
         entry.deleted_at = None
     entry.full_name = full_name
+    entry.class_id = class_id
     if student is not None:
         entry.student_id = student.id
         entry.status = "bound"
+        if class_id is not None:
+            student.class_id = class_id
     else:
         entry.student_id = None
         entry.status = "pending"
@@ -275,7 +314,7 @@ async def import_roster(
     - **JSON**：`Content-Type: application/json`，body 为 `{"rows":[{"studentNo","fullName"},...]}` 或 **数组** 同上结构。
     - **文件**：`multipart/form-data`，`file` 为 `.csv` 或 `.json`。
     """
-    rows: list[tuple[str, str]] = []
+    rows: list[tuple[str, str, str | None]] = []
     ct = (request.headers.get("content-type") or "").lower()
     if "application/json" in ct:
         try:
@@ -298,10 +337,11 @@ async def import_roster(
             detail="use application/json or multipart/form-data with file",
         )
     n = 0
-    for sn, fn in rows:
+    for sn, fn, class_label in rows:
         if not sn or not fn:
             continue
-        await _upsert_roster_row(db, sn, fn)
+        cid = await _get_or_create_class_id(db, class_label)
+        await _upsert_roster_row(db, sn, fn, cid)
         n += 1
     return {"ok": True, "imported": n}
 

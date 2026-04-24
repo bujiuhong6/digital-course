@@ -10,7 +10,11 @@ def _bootstrap_and_login(client) -> None:
 def _import_one(client) -> None:
     r = client.post(
         "/v1/admin/roster/import",
-        json={"rows": [{"studentNo": "S001", "fullName": "张三"}]},
+        json={
+            "rows": [
+                {"studentNo": "S001", "fullName": "张三", "className": "测试班"},
+            ],
+        },
     )
     assert r.status_code == 200, r.text
     assert r.json().get("imported") == 1
