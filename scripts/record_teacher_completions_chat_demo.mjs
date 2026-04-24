@@ -48,7 +48,7 @@ async function main() {
   await p2.getByLabel("学号", { exact: true }).fill(STU.no);
   await p2.getByLabel("密码", { exact: true }).fill(STU.pw);
   await p2.getByRole("button", { name: "进入" }).click();
-  await p2.getByText("已发布章").waitFor();
+  await p2.getByText("章节练习列表").waitFor();
   await wait(1200);
   const openCh = p2
     .getByRole("button", { name: /E2E/ })
