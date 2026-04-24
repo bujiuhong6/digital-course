@@ -1,25 +1,33 @@
 """
-学生：注册、**JWT 登录**、**GET /me**（设计 §3.2；任务 4–5）。
+学生：注册、**JWT 登录**、**GET /me**、**已发布章**、**cell 上报**、**本章完成**（设计 §4.2；任务 4–8）。
 
-- 请求/响应 JSON 字段 **camelCase**（如 `studentNo`, `accessToken`）。
-- 会话：**`Authorization: Bearer <JWT>`**；`sub` 为学生 id，**约 15 分钟**有效（见 `Settings.student_jwt_exp_minutes`）。
+- 请求/响应 JSON 字段 **camelCase**。
+- 会话：**`Authorization: Bearer <JWT>`**；`sub` 为学生 id（见 `Settings.student_jwt_exp_minutes`）。
+- **单章**响应**不含**教师草稿（`sourceMaterial`、`aiGeneratedDraft` 等）。
 """
 
 from __future__ import annotations
 
 import hmac
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from ..db.models import RosterEntry, Student
+from ..db.models import CellVerification, Chapter, ChapterCompletion, RosterEntry, Student
 from ..deps import CurrentStudent, DBSession
+from ..services.cell_eval import (
+    is_cell_passing,
+    required_cell_ids_from_content,
+)
 from ..services.crypto import decrypt_password, encrypt_password
 from ..services.student_jwt import create_student_token
 
 router = APIRouter(prefix="/v1/student", tags=["student"])
+
+_STOUT_MAX = 200_000
 
 
 class RegisterBody(BaseModel):
@@ -122,3 +130,180 @@ async def student_me(me: CurrentStudent) -> dict:
             "mustChangePassword": me.must_change_password,
         },
     }
+
+
+# --- 任务 8：只读**已发布**章、cell 验证、章完成 ---
+
+
+def _public_chapter_dict(ch: Chapter) -> dict:
+    """学生可见；**无** `sourceMaterial` / 草稿等。"""
+    return {
+        "id": str(ch.id),
+        "slug": ch.slug,
+        "title": ch.title,
+        "order": ch.order,
+        "contentStatus": ch.content_status,
+        "publishedContent": ch.published_content,
+        "updatedAt": ch.updated_at.isoformat() if ch.updated_at else None,
+    }
+
+
+@router.get("/chapters")
+async def list_published_chapters(me: CurrentStudent, db: DBSession) -> dict:
+    r = await db.execute(
+        select(Chapter)
+        .where(Chapter.content_status == "published")
+        .order_by(Chapter.order, Chapter.title)
+    )
+    rows = r.scalars().all()
+    return {
+        "ok": True,
+        "chapters": [
+            {
+                "chapterId": str(c.id),
+                "slug": c.slug,
+                "title": c.title,
+                "order": c.order,
+                "updatedAt": c.updated_at.isoformat() if c.updated_at else None,
+            }
+            for c in rows
+        ],
+    }
+
+
+@router.get("/chapters/{chapter_id}")
+async def get_published_chapter(
+    me: CurrentStudent, db: DBSession, chapter_id: uuid.UUID
+) -> dict:
+    r = await db.execute(
+        select(Chapter).where(Chapter.id == chapter_id, Chapter.content_status == "published")
+    )
+    ch = r.scalar_one_or_none()
+    if ch is None:
+        raise HTTPException(status_code=404, detail="chapter not found or not published")
+    return {"ok": True, "chapter": _public_chapter_dict(ch)}
+
+
+class CellVerifyBody(BaseModel):
+    model_config = {"populate_by_name": True}
+
+    chapter_id: uuid.UUID = Field(alias="chapterId")
+    cell_id: str = Field(min_length=1, max_length=128, alias="cellId")
+    run_ok: bool = Field(alias="runOk")
+    stdout: str | None = None
+    stderr: str | None = None
+    error_excerpt: str | None = Field(default=None, max_length=500, alias="errorExcerpt")
+    elapsed_ms: int | None = Field(default=None, ge=0, alias="elapsedMs")
+
+
+@router.post("/cells/verify")
+async def verify_cell(
+    me: CurrentStudent, db: DBSession, body: CellVerifyBody
+) -> dict:
+    """
+    据 **§4.2** `passRule` 与上报计算是否过关，写入/更新 `cell_verifications`（**唯一**学生+章+cell，**只保留一条**即覆盖）。
+    响应 `passed` 为**服务端**判定；`runOk` 为入库值（与 `passed` 一致）。
+    """
+    r = await db.execute(
+        select(Chapter).where(
+            Chapter.id == body.chapter_id,
+            Chapter.content_status == "published",
+        )
+    )
+    ch = r.scalar_one_or_none()
+    if ch is None or ch.published_content is None or not isinstance(ch.published_content, dict):
+        raise HTTPException(status_code=404, detail="chapter not found or not published")
+    pc = ch.published_content
+    out = (body.stdout or "")[:_STOUT_MAX]
+    err_s = (body.stderr or "")[:_STOUT_MAX]
+    passed = is_cell_passing(
+        pc,
+        body.cell_id,
+        run_ok=body.run_ok,
+        stdout=out,
+        stderr=err_s,
+    )
+    ex = (body.error_excerpt or "")[:500] if body.error_excerpt else None
+    now = datetime.now(timezone.utc)
+    existing = await db.execute(
+        select(CellVerification).where(
+            CellVerification.student_id == me.id,
+            CellVerification.chapter_id == body.chapter_id,
+            CellVerification.cell_id == body.cell_id,
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row is None:
+        db.add(
+            CellVerification(
+                student_id=me.id,
+                chapter_id=body.chapter_id,
+                cell_id=body.cell_id,
+                run_ok=passed,
+                at=now,
+                stdout=out or None,
+                error_excerpt=ex,
+                elapsed_ms=body.elapsed_ms,
+            )
+        )
+    else:
+        row.run_ok = passed
+        row.at = now
+        row.stdout = out or None
+        row.error_excerpt = ex
+        row.elapsed_ms = body.elapsed_ms
+    return {
+        "ok": True,
+        "passed": passed,
+        "runOk": passed,
+    }
+
+
+@router.post("/chapters/{chapter_id}/complete", status_code=status.HTTP_200_OK)
+async def complete_chapter(
+    me: CurrentStudent, db: DBSession, chapter_id: uuid.UUID
+) -> dict:
+    """
+    必做 **guideCell + extensionCell** 的 **全部** `cell` id 在库中 `run_ok=true` 才记完成；否则 **400**。
+    已存在完成记录时 **200** 幂等。
+    """
+    r = await db.execute(
+        select(Chapter).where(Chapter.id == chapter_id, Chapter.content_status == "published")
+    )
+    ch = r.scalar_one_or_none()
+    if ch is None or ch.published_content is None:
+        raise HTTPException(status_code=404, detail="chapter not found or not published")
+    pc = ch.published_content
+    if not isinstance(pc, dict):
+        raise HTTPException(status_code=400, detail="invalid published content")
+    need = required_cell_ids_from_content(pc)
+    if not need:
+        raise HTTPException(status_code=400, detail="no cells in chapter")
+    for cid in need:
+        vr = await db.execute(
+            select(CellVerification).where(
+                CellVerification.student_id == me.id,
+                CellVerification.chapter_id == chapter_id,
+                CellVerification.cell_id == cid,
+                CellVerification.run_ok.is_(True),
+            )
+        )
+        if vr.scalar_one_or_none() is None:
+            raise HTTPException(
+                status_code=400, detail="cells_not_all_passing",
+            )
+    ex = await db.execute(
+        select(ChapterCompletion).where(
+            ChapterCompletion.student_id == me.id,
+            ChapterCompletion.chapter_id == chapter_id,
+        )
+    )
+    if ex.scalar_one_or_none() is not None:
+        return {"ok": True, "alreadyCompleted": True}
+    db.add(
+        ChapterCompletion(
+            student_id=me.id,
+            chapter_id=chapter_id,
+        )
+    )
+    return {"ok": True, "alreadyCompleted": False}
