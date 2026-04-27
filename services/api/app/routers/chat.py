@@ -24,6 +24,7 @@ from sqlalchemy import select
 from ..config import (
     merge_openai_compat_llm_headers,
     normalize_openai_compat_base_url,
+    openai_compat_chat_completions_url,
     settings,
 )
 from ..db.models import Chapter, Student
@@ -134,7 +135,7 @@ async def _student_chat_impl(
         }
         return JSONResponse(content=mock_body)
 
-    url = f"{base}/v1/chat/completions"
+    url = openai_compat_chat_completions_url(base)
     api_key = settings.chat_llm_api_key or settings.llm_api_key
     messages = [
         {

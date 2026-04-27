@@ -8,6 +8,20 @@ export type PyodideLike = {
   runPythonAsync: (code: string) => Promise<unknown>;
 };
 
+/** `loadPyodide` 完整返回值（含 `loadPackage`） */
+export type PyodideWithPackages = PyodideLike & {
+  loadPackage: (names: string | string[]) => Promise<unknown>;
+};
+
+declare global {
+  interface Document {
+    /** matplotlib_pyodide 作图时挂载的父节点（见 browser_backend._create_root_element） */
+    pyodideMplTarget?: HTMLElement;
+    /** 部分 matplotlib-pyodide 版本/后端读取的挂载名。 */
+    pyodideMatplotlibPlotTarget?: HTMLElement;
+  }
+}
+
 export type RunResult = {
   stdout: string;
   stderr: string;
@@ -31,8 +45,9 @@ function scriptUrl(): string {
 
 const defaultIndex = "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/";
 
-let instance: PyodideLike | null = null;
-let loadPromise: Promise<PyodideLike> | null = null;
+let instance: PyodideWithPackages | null = null;
+let loadPromise: Promise<PyodideWithPackages> | null = null;
+let packagesReady = false;
 
 function indexUrl(): string {
   const u = import.meta.env.VITE_PYODIDE_INDEX_URL;
@@ -43,8 +58,9 @@ function indexUrl(): string {
 }
 
 function getLoadPyodideFromWindow() {
-  return (window as unknown as { loadPyodide?: (o?: { indexURL: string }) => Promise<PyodideLike> })
-    .loadPyodide;
+  return (window as unknown as {
+    loadPyodide?: (o?: { indexURL: string }) => Promise<PyodideWithPackages>;
+  }).loadPyodide;
 }
 
 async function waitFor(
@@ -88,7 +104,7 @@ function injectPyodideScriptTag(): Promise<void> {
  * 等待全局 loadPyodide 出现：先等 index 里脚本，超时则动态插入并重试（首下可能较慢）。
  */
 async function waitForLoadPyodideFunction(): Promise<
-  (o?: { indexURL: string }) => Promise<PyodideLike>
+  (o?: { indexURL: string }) => Promise<PyodideWithPackages>
 > {
   const quick = 5000;
   const long = 120000;
@@ -118,22 +134,87 @@ async function waitForLoadPyodideFunction(): Promise<
   );
 }
 
-export async function ensurePyodide(): Promise<PyodideLike> {
+const BUILTIN_PACKAGES = [
+  "micropip",
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "matplotlib-pyodide",
+  "wordcloud",
+  "Jinja2",
+] as const;
+
+async function ensureBuiltinPackages(py: PyodideWithPackages): Promise<void> {
+  if (packagesReady) {
+    return;
+  }
+  await py.loadPackage([...BUILTIN_PACKAGES]);
+  await py.runPythonAsync(`
+import micropip
+try:
+    await micropip.install("openpyxl", keep_going=True)
+except Exception:
+    # openpyxl is only needed for Excel files. Keep Python exercises available
+    # when PyPI/network access is blocked in the browser.
+    pass
+`);
+  await py.runPythonAsync(`
+import matplotlib
+matplotlib.use("module://matplotlib_pyodide.wasm_backend")
+`);
+  packagesReady = true;
+}
+
+/** 运行前关闭 matplotlib 图形（忽略未导入时错误） */
+const CLOSE_MPL = `
+try:
+    import matplotlib.pyplot as _plt
+    _plt.close("all")
+except Exception:
+    pass
+`;
+
+export async function ensurePyodide(): Promise<PyodideWithPackages> {
   if (instance) {
     return instance;
   }
   if (!loadPromise) {
     loadPromise = (async () => {
       const loadPyodide = await waitForLoadPyodideFunction();
-      return loadPyodide({ indexURL: indexUrl() });
+      const raw = (await loadPyodide({ indexURL: indexUrl() })) as PyodideWithPackages;
+      if (typeof raw.loadPackage !== "function") {
+        throw new Error("Pyodide 实例缺少 loadPackage，请检查 pyodide 版本与 indexURL。");
+      }
+      await ensureBuiltinPackages(raw);
+      return raw;
     })();
   }
   instance = await loadPromise;
   return instance;
 }
 
-export async function runPythonInPyodide(code: string): Promise<RunResult> {
+export type RunPythonOptions = {
+  /** 图形挂载父节点；未提供时 `matplotlib_pyodide` 回退到 `document.body` 作为根 */
+  mplMount?: HTMLElement | null;
+};
+
+/**
+ * 学生代码执行：预装 numpy / pandas / matplotlib（含 matplotlib-pyodide）/ wordcloud / Jinja2、micropip 装 openpyxl；
+ * 若提供 `mplMount`，图形显示在该节点内；运行前会 `plt.close('all')` 并清空 `mplMount` 子节点。
+ */
+export async function runPythonInPyodide(
+  code: string,
+  options?: RunPythonOptions,
+): Promise<RunResult> {
   const py = await ensurePyodide();
+  if (options?.mplMount) {
+    options.mplMount.replaceChildren();
+    document.pyodideMplTarget = options.mplMount;
+    document.pyodideMatplotlibPlotTarget = options.mplMount;
+  } else {
+    delete document.pyodideMplTarget;
+    delete document.pyodideMatplotlibPlotTarget;
+  }
   let stdout = "";
   let stderr = "";
   py.setStdout({ batched: (s: string) => {
@@ -144,6 +225,7 @@ export async function runPythonInPyodide(code: string): Promise<RunResult> {
   } });
   const t0 = performance.now();
   try {
+    await py.runPythonAsync(CLOSE_MPL);
     await py.runPythonAsync(code);
     const elapsedMs = Math.max(0, Math.round(performance.now() - t0));
     return {

@@ -54,6 +54,8 @@ type ChapterBody = {
   updatedAt: string | null;
   /** 服务端是否已记录本章完成 */
   hasCompletedChapter?: boolean;
+  /** 当前学生在库中 run_ok 为 true 的 cellId（与 complete 要求同源） */
+  cellsPassed?: string[];
 };
 
 function App() {
@@ -313,7 +315,6 @@ function App() {
                     >
                       {c.title}
                     </button>
-                    <span className="sd-muted"> {c.slug}</span>
                   </div>
                   <span
                     className="sd-list-status"
@@ -361,6 +362,12 @@ function App() {
               title={selected.title}
               publishedContent={selected.publishedContent}
               initialChapterCompleted={!!selected.hasCompletedChapter}
+              initialCellsPassed={selected.cellsPassed ?? []}
+              onBackToList={() => {
+                setSelected(null);
+                setScreen("chapters");
+                void goChapters();
+              }}
             />
           ) : selected.publishedContent ? (
             <p className="sd-muted">正在加载学生信息…</p>

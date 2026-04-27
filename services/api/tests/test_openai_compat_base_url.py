@@ -47,6 +47,17 @@ def test_normalize_openai_compat_base_url() -> None:
     )
 
 
+def test_openai_compat_chat_completions_url_handles_deepseek_docs_path() -> None:
+    assert (
+        config.openai_compat_chat_completions_url("https://api.deepseek.com")
+        == "https://api.deepseek.com/chat/completions"
+    )
+    assert (
+        config.openai_compat_chat_completions_url("https://api.siliconflow.cn")
+        == "https://api.siliconflow.cn/v1/chat/completions"
+    )
+
+
 def test_merge_adds_openrouter_optional_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

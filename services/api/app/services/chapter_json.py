@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import ast
 from typing import Annotated, Any, Literal, Union
 from uuid import uuid4
 
@@ -54,7 +55,14 @@ class GuideCell(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(min_length=1, max_length=128)
-    starter_code: str = Field(min_length=1, alias="starterCode")
+    # 允许空串：学生端可用手敲 + 背景提示层，不预置完整代码
+    starter_code: str = Field(default="", min_length=0, alias="starterCode")
+    setup_code: str | None = Field(
+        default=None,
+        max_length=2_000_000,
+        alias="setupCode",
+        description="运行前自动拼接的隐藏准备代码，用于预加载数据等公共上下文",
+    )
     description: str = Field(min_length=1, max_length=16_000)
     pass_rule: PassRule = Field(alias="passRule")
     exercise_title: str | None = Field(
@@ -69,11 +77,35 @@ class GuideCell(BaseModel):
         alias="expectedOutput",
         description="本题期望输出/结果说明，学生端在代码区前展示",
     )
+    expected_image_data_url: str | None = Field(
+        default=None,
+        max_length=2_000_000,
+        alias="expectedImageDataUrl",
+        description="matplotlib 等作图题的参考图片 data URL，供教师预览/学生对照",
+    )
+    expected_image_alt: str | None = Field(
+        default=None,
+        max_length=500,
+        alias="expectedImageAlt",
+        description="参考图片替代文本",
+    )
     reference_answer: str | None = Field(
         default=None,
         max_length=32_000,
         alias="referenceAnswer",
         description="教师可填标准答案/参考代码（发布给学生端作提示，不参与服务端判分）",
+    )
+    code_backdrop_label: str | None = Field(
+        default=None,
+        max_length=2_000,
+        alias="codeBackdropLabel",
+        description="基础练习空框时的红色提示行（学生端只读背景）",
+    )
+    code_backdrop_code: str | None = Field(
+        default=None,
+        max_length=32_000,
+        alias="codeBackdropCode",
+        description="基础练习空框时的浅灰示例代码（学生端只读背景）",
     )
 
 
@@ -85,6 +117,12 @@ class ExtensionCell(BaseModel):
     starter_code: str | None = Field(
         default=None, max_length=1_000_000, alias="starterCode"
     )
+    setup_code: str | None = Field(
+        default=None,
+        max_length=2_000_000,
+        alias="setupCode",
+        description="运行前自动拼接的隐藏准备代码，用于预加载数据等公共上下文",
+    )
     pass_rule: PassRule = Field(alias="passRule")
     exercise_title: str | None = Field(
         default=None,
@@ -95,6 +133,16 @@ class ExtensionCell(BaseModel):
         default=None,
         max_length=8_000,
         alias="expectedOutput",
+    )
+    expected_image_data_url: str | None = Field(
+        default=None,
+        max_length=2_000_000,
+        alias="expectedImageDataUrl",
+    )
+    expected_image_alt: str | None = Field(
+        default=None,
+        max_length=500,
+        alias="expectedImageAlt",
     )
     reference_answer: str | None = Field(
         default=None,
@@ -133,6 +181,11 @@ class PublishedContentV1(BaseModel):
         max_length=500_000,
         alias="chapterIntroHtml",
         description="章首主要知识点介绍（在章节名下方、各知识点块之前）",
+    )
+    requires_matplotlib_output: bool | None = Field(
+        default=None,
+        alias="requiresMatplotlibOutput",
+        description="显式控制学生端是否显示作图区；缺省由 starter/草稿代码等启发式决定",
     )
     blocks: list[ContentBlock] = Field(min_length=1)
 
@@ -223,11 +276,91 @@ def validate_for_publish(
                     error="extension passRule must not be only 'no_exception' (design §4.2); use stdout_contains or assert_snippet",
                     warnings=list(w),
                 )
+    content = model.model_dump(mode="json", by_alias=True)
+    _normalize_published_guide_backdrop(content)
+    w.extend(_warn_invalid_reference_python(content))
     return PublishResult(
         ok=True,
-        content=model.model_dump(mode="json", by_alias=True),
+        content=content,
         warnings=list(w),
     )
+
+
+def _normalize_published_guide_backdrop(content: dict[str, Any]) -> None:
+    """基础题发布时固定补齐「红字提示 + 灰字参考代码」并清掉重复说明注释。"""
+    blocks = content.get("blocks")
+    if not isinstance(blocks, list):
+        return
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        g = b.get("guideCell")
+        if not isinstance(g, dict):
+            continue
+        if not (g.get("codeBackdropLabel") or "").strip():
+            g["codeBackdropLabel"] = _DEFAULT_GUIDE_BACKDROP_LABEL
+        if not (g.get("codeBackdropCode") or "").strip():
+            g["codeBackdropCode"] = _guide_backdrop_code_source(g)
+        _strip_redundant_guide_first_line(g)
+        if (g.get("codeBackdropCode") or "").strip():
+            g["starterCode"] = ""
+
+
+# 与题目底纹并存时易遮挡红字；发布时剥掉仅作说明的首行
+_DF_PREFILL_COMMENT = "# 数据已预加载为 df，请在下方补全代码"
+_DEFAULT_GUIDE_BACKDROP_LABEL = "提示：请参考灰色代码，在下方代码框中手动输入并运行。"
+
+
+def _guide_backdrop_code_source(g: dict[str, Any]) -> str:
+    ref = g.get("referenceAnswer")
+    if isinstance(ref, str) and ref.strip():
+        return ref.strip("\n")
+    sc = g.get("starterCode")
+    if isinstance(sc, str) and sc.strip():
+        lines = sc.splitlines()
+        if lines and lines[0].strip().startswith("# 数据已预加载为 df"):
+            return "\n".join(lines[1:]).strip("\n")
+        return sc.strip("\n")
+    return ""
+
+
+def _warn_invalid_reference_python(content: dict[str, Any]) -> list[str]:
+    warnings: list[str] = []
+    blocks = content.get("blocks")
+    if not isinstance(blocks, list):
+        return warnings
+    for i, b in enumerate(blocks):
+        if not isinstance(b, dict):
+            continue
+        for cell_key in ("guideCell", "extensionCell"):
+            cell = b.get(cell_key)
+            if not isinstance(cell, dict):
+                continue
+            for field in ("referenceAnswer", "codeBackdropCode"):
+                value = cell.get(field)
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                try:
+                    ast.parse(value)
+                except SyntaxError as e:
+                    warnings.append(
+                        f"blocks[{i}].{cell_key}.{field} is not valid Python: {e.msg} at line {e.lineno}",
+                    )
+    return warnings
+
+
+def _strip_redundant_guide_first_line(g: dict[str, Any]) -> None:
+    if not (g.get("codeBackdropLabel") or "").strip():
+        return
+    sc = g.get("starterCode")
+    if not isinstance(sc, str) or not sc.strip():
+        return
+    lines = sc.splitlines()
+    if not lines:
+        return
+    first = lines[0].strip()
+    if first == _DF_PREFILL_COMMENT or first.startswith("# 数据已预加载为 df"):
+        g["starterCode"] = "\n".join(lines[1:]).lstrip("\n")
 
 
 def sample_published_v1() -> dict[str, Any]:
@@ -245,6 +378,8 @@ def sample_published_v1() -> dict[str, Any]:
                 "guideCell": {
                     "id": "c1",
                     "starterCode": "print('hi')",
+                    "codeBackdropLabel": "提示：向标准输出打印一行字符。",
+                    "codeBackdropCode": "print('hi')",
                     "description": "<p>运行一段代码，无异常即通过</p>",
                     "exerciseTitle": "第 1 题（基础）",
                     "expectedOutput": "终端出现 hi 等输出即可（no_exception 模式）",

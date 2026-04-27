@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "requiresMatplotlibOutput": true,
+  "chapterIntroHtml": "<h1>本章核心知识点</h1><p>【替换】用一两段概括全章。以下为<strong>各章共用的结构约定</strong>，供作者或生成模型遵守。</p><h2>1. 块与题量</h2><ul><li>每个二级知识点子部分出 <strong>2～3 道</strong>可判分代码题：2 道＝<strong>1 个</strong><code>block</code>（<code>guideCell</code> + <code>extensionCell</code>）；3 道＝<strong>2 个</strong><code>block</code>，第二块在 <code>sectionTitle</code> 或 <code>knowledgeHtml</code> 中标注「续」或「第 3 题」。</li><li><strong>本章综合扩展</strong>共 <strong>4～5 道</strong>：4 道＝2 个 <code>block</code>；5 道＝3 个 <code>block</code>（2+2+1）。仅在<strong>综合扩展第一块</strong>的 <code>knowledgeHtml</code> 最前加 <code>&lt;h1&gt;本章知识点的扩展练习&lt;/h1&gt;</code>。</li></ul><h2>2. 根级与判分</h2><ul><li><code>version</code> 固定为 <code>1</code>。</li><li><code>requiresMatplotlibOutput</code>：本章包含 matplotlib 或 wordcloud 作图题时设为 <code>true</code>，学生端会在对应作图题下方显示<strong>图形输出</strong>区域；仅标准输出/无作图时设为 <code>false</code> 或 <code>null</code>。</li><li>每个 <code>guideCell</code> / <code>extensionCell</code> 均须有 <code>passRule</code>；发布时扩展题宜优先 <code>stdout_contains</code> 搭配 <code>print</code> 输出可校验子串。纯作图题可用 <code>no_exception</code>，并在 <code>expectedOutput</code> 中描述图形应长什么样。</li></ul><h2>3. 学生端与 HTML</h2><ul><li>题目正文用自然语描述题意和期望；具体机器判定以 JSON 的 <code>passRule</code> 为准，无需在正文中写冗长判分实现说明。</li><li>基础题：请提供非空的 <code>codeBackdropLabel</code>（学生端红字提示）与 <code>codeBackdropCode</code>（灰字参考代码）。红字与灰字作为同一个代码框内的底纹显示；学生点击代码框后底纹消失，需要凭记忆手敲。基础题 <code>starterCode</code> 建议固定为空字符串 <code>\"\"</code>，避免答案直接预填进可编辑区域。扩展题 <code>referenceAnswer</code> 供教师/预览，学生端默认不展示。</li><li>教师端「发布预览」可显示基础/扩展的参考内容（<code>codeBackdropCode</code>、<code>referenceAnswer</code> 等）供教师核对；学生端不展示这些教师侧参考字段。</li><li>参考图片：每个 cell 可填 <code>expectedImageDataUrl</code>（如 <code>data:image/png;base64,...</code>）和 <code>expectedImageAlt</code>。填了以后，教师端发布预览和学生端题面都会显示参考图；不需要参考图时填 <code>null</code>。</li></ul><h2>4. 运行环境</h2><p>学生端为 Pyodide，可按题意 <code>import</code> 所需（常见库多已预装）。matplotlib 题参考代码必须 <code>import matplotlib.pyplot as plt</code>；wordcloud 题可使用 <code>from wordcloud import WordCloud</code> 生成词云对象，再用 <code>plt.imshow(...)</code> 展示。作图后调用 <code>plt.show()</code>；学生点击「执行」后，运行生成的图片会显示在当前题下方的「图形输出」区域。若希望发布时就能看到参考效果，请同时填写 <code>expectedImageDataUrl</code>。</p>",
+  "blocks": [
+    {
+      "id": "blk-11111111-1111-1111-1111-111111111101",
+      "sectionTitle": "1.1 【二级标题】子知识点 A",
+      "knowledgeHtml": "<h2>1.1 【二级】子知识点 A</h2><p>【替换】与<strong>本小节</strong>相关的知识讲解。下面列出本小节两道题的题意摘要。</p><p>本小节共 <strong>2 道</strong>题，占 1 个 <code>block</code>：</p><ul><li>第 1 题（基础，<code>guideCell</code>）…</li><li>第 2 题（扩展，<code>extensionCell</code>）…</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-a1-g",
+        "starterCode": "",
+        "description": "<p>【第 1 题 · 基础】在编辑器中自写代码，可参照灰底提示。</p>",
+        "exerciseTitle": "1.1-基础",
+        "expectedOutput": "标准输出出现 hello。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "referenceAnswer": null,
+        "codeBackdropLabel": "提示：向终端打印一行。",
+        "codeBackdropCode": "print('hello')",
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "hello"
+        }
+      },
+      "extensionCell": {
+        "id": "c-a1-e",
+        "promptHtml": "<p>【第 2 题 · 扩展】【替换题意】</p>",
+        "starterCode": "n = 0\n# 在下方编写代码，使终端能打印 6",
+        "exerciseTitle": "1.1-扩展",
+        "expectedOutput": "出现数字 6。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "referenceAnswer": "n = 3\nprint(n * 2)",
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "6"
+        }
+      }
+    },
+    {
+      "id": "blk-11111111-1111-1111-1111-111111111102",
+      "sectionTitle": "1.1 【二级】子知识点 A（第 2～3 题）",
+      "knowledgeHtml": "<h2>1.1 续</h2><p>同一小节需要 <strong>第 3 道</strong>题时，增加本 <code>block</code>。若上块已占满 2 题，本块可只含第 3 题与占位格，或第 3～4 题，按你编排调整。</p><ul><li><strong>第 3 题</strong>…</li><li>（可选）格内自测在 <code>extensionCell</code>。</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-a2-g",
+        "starterCode": "",
+        "codeBackdropLabel": "提示：可先运行再修改，观察输出是否为 4。",
+        "codeBackdropCode": "import math\nprint(int(math.sqrt(16)))",
+        "description": "<p>【第 3 题】仅当本小节要凑满 3 道独立题时保留本 <code>block</code>。</p>",
+        "exerciseTitle": "1.1-题3",
+        "expectedOutput": "出现 4。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "4"
+        }
+      },
+      "extensionCell": {
+        "id": "c-a2-e",
+        "promptHtml": "<p>【自测/补充】可删；若上块三题已齐且无需本格，可整段合并或删除本 <code>block</code>。</p>",
+        "starterCode": "print('ok')",
+        "exerciseTitle": "1.1-自测",
+        "expectedOutput": "ok。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ok"
+        }
+      }
+    },
+    {
+      "id": "blk-22222222-2222-2222-2222-222222222201",
+      "sectionTitle": "1.2 【二级】子知识点 B",
+      "knowledgeHtml": "<h2>1.2 …</h2><p>本小节若只要 <strong>2 道</strong>题，1 个 <code>block</code> 即可。下面为例示。</p><p>若题目通过 <code>setupCode</code> 预加载资料，学生看不到这段隐藏代码，因此必须在 <code>description</code> 或 <code>promptHtml</code> 里写清：可直接使用的变量名、数据类型、每个字段名和字段含义；基础题还应在 <code>codeBackdropLabel</code> 中再次提示这些字段。</p><ul><li>第 1 题（基础）…</li><li>第 2 题（扩展）…</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-b1-g",
+        "starterCode": "",
+        "setupCode": "students = [{'name': '小明', 'score': 86}, {'name': '小红', 'score': 92}]\n# students 已预加载；字段：name 表示姓名，score 表示成绩",
+        "codeBackdropLabel": "提示：已预加载 students。每条数据都有 name 和 score 字段。",
+        "codeBackdropCode": "print(students[0]['name'])\nprint(students[1]['score'])",
+        "description": "<p>已预加载变量 <code>students</code>，它是一个学生列表。每个学生有两个字段：<code>name</code> 表示姓名，<code>score</code> 表示成绩。请打印第 1 个学生的姓名和第 2 个学生的成绩。</p>",
+        "exerciseTitle": "1.2-基础（预加载字段示例）",
+        "expectedOutput": "出现小明和 92。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "92"
+        }
+      },
+      "extensionCell": {
+        "id": "c-b1-e",
+        "promptHtml": "<p>【第 2 题】在循环或分支中向终端输出固定标记，便于 <code>stdout_contains</code> 校验。【替换为真实题意】</p>",
+        "starterCode": "for i in range(1):\n    pass\n# 输出一行，包含标记 passed",
+        "exerciseTitle": "1.2-扩展",
+        "expectedOutput": "含 passed。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "passed"
+        }
+      }
+    },
+    {
+      "id": "blk-33333333-3333-3333-3333-333333333301",
+      "sectionTitle": "本章综合扩展 ①",
+      "knowledgeHtml": "<h1>本章知识点的扩展练习</h1><p>【替换】综合扩展区总述。下表为 <strong>5 道</strong>扩展示例，占 3 个 <code>block</code>：本块 2 题＋下块 2 题＋再下块 1 题。若只出 <strong>4 道</strong>，可删除最后一块并改写列表与题号。</p><ul><li>扩展 1、2 在本 <code>block</code> 两格；</li><li>扩展 3、4 在下一 <code>block</code>；</li><li>扩展 5 在再下一 <code>block</code>（若需第五题）。</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-x1-g",
+        "starterCode": "",
+        "codeBackdropLabel": "提示：终端输出须含下方判分子串。",
+        "codeBackdropCode": "print('ext-1')",
+        "description": "<p>综合扩展第 1 题【替换】</p>",
+        "exerciseTitle": "扩展-1",
+        "expectedOutput": "含 ext-1。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ext-1"
+        }
+      },
+      "extensionCell": {
+        "id": "c-x1-e",
+        "promptHtml": "<p>综合扩展第 2 题【替换】</p>",
+        "starterCode": "print('ext-2')",
+        "exerciseTitle": "扩展-2",
+        "expectedOutput": "含 ext-2。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ext-2"
+        }
+      }
+    },
+    {
+      "id": "blk-33333333-3333-3333-3333-333333333302",
+      "sectionTitle": "本章综合扩展 ②（含 matplotlib / wordcloud 作图示例）",
+      "knowledgeHtml": "<h2>扩展练习（续）</h2><p>扩展 3、4 题。【替换题意】若本章包含 matplotlib 或 wordcloud 作图题，请将根级 <code>requiresMatplotlibOutput</code> 设为 <code>true</code>，并在题目中要求学生调用 <code>plt.show()</code>。词云题可使用 <code>from wordcloud import WordCloud</code> 生成词云对象，再用 <code>plt.imshow(...)</code> 显示。</p><ul><li>第 3 题；</li><li>第 4 题为作图示例，可替换为真实 matplotlib 或 wordcloud 题目。</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-x2-g",
+        "starterCode": "",
+        "codeBackdropLabel": "提示：stdout 含 ext-3。",
+        "codeBackdropCode": "print('ext-3')",
+        "description": "<p>综合扩展第 3 题【替换】</p>",
+        "exerciseTitle": "扩展-3",
+        "expectedOutput": "ext-3。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ext-3"
+        }
+      },
+      "extensionCell": {
+        "id": "c-x2-e",
+        "promptHtml": "<p>综合扩展第 4 题【matplotlib / wordcloud 作图示例】使用 <code>matplotlib</code> 画一条简单折线图：横轴为 1、2、3，纵轴为 2、4、6；若要做词云题，可使用 <code>from wordcloud import WordCloud</code> 生成词云后用 <code>plt.imshow(...)</code> 展示。作图后调用 <code>plt.show()</code>，再打印 <code>折线图完成</code>。</p>",
+        "starterCode": "import matplotlib.pyplot as plt\n\nx = [1, 2, 3]\ny = [2, 4, 6]\n# 在下方补全绘图代码，并调用 plt.show()\n",
+        "exerciseTitle": "扩展-4 作图示例",
+        "expectedOutput": "当前题下方的「图形输出」区域出现一条从左下到右上的折线图；终端显示：折线图完成。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": "参考图：一条递增折线，点为 (1,2)、(2,4)、(3,6)。",
+        "referenceAnswer": "import matplotlib.pyplot as plt\n\nx = [1, 2, 3]\ny = [2, 4, 6]\nplt.plot(x, y, marker=\"o\")\nplt.title(\"简单折线图\")\nplt.xlabel(\"x\")\nplt.ylabel(\"y\")\nplt.grid(True)\nplt.show()\nprint(\"折线图完成\")",
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "折线图完成"
+        }
+      }
+    },
+    {
+      "id": "blk-33333333-3333-3333-3333-333333333303",
+      "sectionTitle": "本章综合扩展 ③",
+      "knowledgeHtml": "<h2>扩展练习（续二）</h2><p>仅当需要 <strong>第 5 道</strong>综合扩展题时保留本 <code>block</code>；若共 4 道题可整段删除本块。</p><ul><li>第 5 题 + 收尾格。</li></ul>",
+      "requiredExecutionMode": "pyodide",
+      "guideCell": {
+        "id": "c-x3-g",
+        "starterCode": "",
+        "codeBackdropLabel": "提示：stdout 含 ext-5。",
+        "codeBackdropCode": "print('ext-5')",
+        "description": "<p>综合扩展第 5 题【替换】</p>",
+        "exerciseTitle": "扩展-5",
+        "expectedOutput": "ext-5。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ext-5"
+        }
+      },
+      "extensionCell": {
+        "id": "c-x3-e",
+        "promptHtml": "<p>收尾、附加小问或删去整格。</p>",
+        "starterCode": "print('ext-done')",
+        "exerciseTitle": "扩展-收尾",
+        "expectedOutput": "ext-done。",
+        "expectedImageDataUrl": null,
+        "expectedImageAlt": null,
+        "passRule": {
+          "mode": "stdout_contains",
+          "expectedSubstring": "ext-done"
+        }
+      }
+    }
+  ]
+}

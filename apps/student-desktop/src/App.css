@@ -326,3 +326,53 @@ body,
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Matplotlib（matplotlib_pyodide）挂载区：与 .jnb-student-embed 白底卡片一致 */
+.sd-mpl-wrap {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.sd-mpl-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0 0 0.35rem;
+}
+
+.sd-mpl-hint {
+  font-size: 0.8rem;
+  color: #475569;
+  margin: 0 0 0.6rem;
+  line-height: 1.45;
+}
+
+.sd-mpl-hint code {
+  font-size: 0.78rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  padding: 0.1rem 0.35rem;
+  color: #334155;
+  font-family: ui-monospace, monospace;
+}
+
+.sd-mpl-target {
+  min-height: 4rem;
+  border-radius: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.sd-mpl-target:empty {
+  min-height: 2rem;
+}

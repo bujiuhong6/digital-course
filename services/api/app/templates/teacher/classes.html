@@ -34,9 +34,8 @@
   <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0.5rem">
     {% for c in classes %}
     <li>
-      <a class="btn secondary" href="/teacher/classes/{{ c.id }}" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none;width:100%;max-width:40rem;justify-content:space-between;box-sizing:border-box">
+      <a class="btn secondary" href="/teacher/classes/{{ c.id }}" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none;width:100%;max-width:40rem;box-sizing:border-box">
         <span><strong>{{ c.name }}</strong></span>
-        <code style="color:var(--muted);font-size:0.78rem">{{ c.id }}</code>
       </a>
     </li>
     {% endfor %}

@@ -249,6 +249,29 @@ def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str, 
     return list(_iter_csv_rows(text))
 
 
+async def _soft_delete_unassigned_roster(db: DBSession) -> int:
+    """
+    将「未分班」的名单行全部标记删除，用于**新一次导入**全量覆盖「当前名单行」
+   （仅 `class_id` 为空的记录；已分入某班的名单行保留）。
+    """
+    now = datetime.now(timezone.utc)
+    r = await db.execute(
+        select(RosterEntry.id).where(
+            RosterEntry.deleted_at.is_(None),
+            RosterEntry.class_id.is_(None),
+        )
+    )
+    ids = list(r.scalars().all())
+    if not ids:
+        return 0
+    await db.execute(
+        update(RosterEntry)
+        .where(RosterEntry.id.in_(ids))
+        .values(deleted_at=now)
+    )
+    return len(ids)
+
+
 async def _get_or_create_class_id(
     db: DBSession, class_name: str | None
 ) -> uuid.UUID | None:
@@ -311,6 +334,9 @@ async def import_roster(
 ) -> dict:
     """
     导入或更新 `roster_entries`；尚无 `students` 学号时为 **pending**；已存在学号时 **bound** 并关联 `student_id`。
+    在写入文件行之前，会先**软删除全部「未分班」的现有 `roster_entries` 行**（`class_id` 为空），
+    使新文件成为**未分班名单**的全量结果；**已分入某班**的名单行不会被删除。
+
     - **JSON**：`Content-Type: application/json`，body 为 `{"rows":[{"studentNo","fullName"},...]}` 或 **数组** 同上结构。
     - **文件**：`multipart/form-data`，`file` 为 `.csv` 或 `.json`。
     """
@@ -336,6 +362,7 @@ async def import_roster(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="use application/json or multipart/form-data with file",
         )
+    await _soft_delete_unassigned_roster(db)
     n = 0
     for sn, fn, class_label in rows:
         if not sn or not fn:

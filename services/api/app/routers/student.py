@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import copy
 import hmac
 import uuid
 from datetime import datetime, timezone
@@ -136,6 +137,30 @@ async def student_me(me: CurrentStudent) -> dict:
 # --- 任务 8：只读**已发布**章、cell 验证、章完成 ---
 
 
+def _redact_cell_reference_answers_for_student(
+    published: dict | None,
+) -> dict | None:
+    """
+    `guideCell` / `extensionCell` 的 `referenceAnswer` 仅供教师/编辑端；从学生拉取的 **publishedContent** 中剥除。
+    """
+    if not isinstance(published, dict):
+        return published
+    out = copy.deepcopy(published)
+    blocks = out.get("blocks")
+    if not isinstance(blocks, list):
+        return out
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        g = b.get("guideCell")
+        if isinstance(g, dict) and "referenceAnswer" in g:
+            del g["referenceAnswer"]
+        ex = b.get("extensionCell")
+        if isinstance(ex, dict) and "referenceAnswer" in ex:
+            del ex["referenceAnswer"]
+    return out
+
+
 def _public_chapter_dict(ch: Chapter) -> dict:
     """学生可见；**无** `sourceMaterial` / 草稿等。"""
     return {
@@ -144,7 +169,9 @@ def _public_chapter_dict(ch: Chapter) -> dict:
         "title": ch.title,
         "order": ch.order,
         "contentStatus": ch.content_status,
-        "publishedContent": ch.published_content,
+        "publishedContent": _redact_cell_reference_answers_for_student(
+            ch.published_content
+        ),
         "updatedAt": ch.updated_at.isoformat() if ch.updated_at else None,
     }
 
@@ -223,6 +250,14 @@ async def get_published_chapter(
     has_completed = cr.scalar_one_or_none() is not None
     d = _public_chapter_dict(ch)
     d["hasCompletedChapter"] = has_completed
+    vrows = await db.execute(
+        select(CellVerification.cell_id).where(
+            CellVerification.student_id == me.id,
+            CellVerification.chapter_id == chapter_id,
+            CellVerification.run_ok.is_(True),
+        )
+    )
+    d["cellsPassed"] = [row[0] for row in vrows.all()]
     return {"ok": True, "chapter": d}
 
 
@@ -349,3 +384,34 @@ async def complete_chapter(
         )
     )
     return {"ok": True, "alreadyCompleted": False}
+
+
+@router.post("/chapters/{chapter_id}/uncomplete", status_code=status.HTTP_200_OK)
+async def uncomplete_chapter(
+    me: CurrentStudent, db: DBSession, chapter_id: uuid.UUID
+) -> dict:
+    """
+    撤回本章「已提交」：删除 `chapter_completions` 中当前学生+本章一行。
+
+    教师端名单/导出与 `chapter_completions` 同源，删行后自动不再计为完成。
+    产品允许撤回重做；若日后要禁止撤回，在此路由返回 403 并保留本注释说明。
+
+    无记录时 **200** + `ok: false`（`detail`: `not_completed`），便于前端提示；
+    已删除或本已无记录时语义：客户端以 `withdrawn` 区分是否发生了删除。
+    """
+    r = await db.execute(
+        select(Chapter).where(Chapter.id == chapter_id, Chapter.content_status == "published")
+    )
+    if r.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="chapter not found or not published")
+    ex = await db.execute(
+        select(ChapterCompletion).where(
+            ChapterCompletion.student_id == me.id,
+            ChapterCompletion.chapter_id == chapter_id,
+        )
+    )
+    row = ex.scalar_one_or_none()
+    if row is None:
+        return {"ok": False, "withdrawn": False, "detail": "not_completed"}
+    await db.delete(row)
+    return {"ok": True, "withdrawn": True}

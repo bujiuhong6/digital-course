@@ -23,6 +23,7 @@ import httpx
 from ..config import (
     merge_openai_compat_llm_headers,
     normalize_openai_compat_base_url,
+    openai_compat_chat_completions_url,
     settings,
 )
 from .chapter_json import sample_published_v1
@@ -75,7 +76,7 @@ async def generate_chapter_draft(
         )
 
     m = model or settings.chapter_gen_model
-    url = f"{base}/v1/chat/completions"
+    url = openai_compat_chat_completions_url(base)
     sys_rules = _prompt_instruction()
     user_block = f"{sys_rules}\n\n--- source_material ---\n{source_material or ''}"
     body = {

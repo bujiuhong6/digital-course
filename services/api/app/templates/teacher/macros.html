@@ -1,0 +1,8 @@
+{# Chapter.content_status → 教师端展示文案 #}
+{% macro content_status_zh(status) -%}
+{%- if status == 'published' -%}已发布
+{%- elif status == 'draft' -%}草稿
+{%- elif status == 'draft_invalid' -%}草稿校验失败
+{%- else -%}{{ status }}
+{%- endif -%}
+{%- endmacro %}

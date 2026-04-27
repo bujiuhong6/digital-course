@@ -210,6 +210,20 @@ async def publish_chapter(_t: CurrentTeacher, db: DBSession, chapter_id: uuid.UU
     }
 
 
+@router.post("/{chapter_id}/unpublish")
+async def unpublish_chapter(_t: CurrentTeacher, db: DBSession, chapter_id: uuid.UUID) -> dict:
+    ch = await _get_chapter_or_404(db, chapter_id)
+    if ch.content_status != "published" or not ch.published_content:
+        raise HTTPException(
+            status_code=400,
+            detail="未查到已发布的章节练习",
+        )
+    ch.published_content = None
+    ch.content_status = "draft"
+    ch.updated_at = datetime.now(timezone.utc)
+    return {"ok": True, "chapter": _chapter_to_dict(ch)}
+
+
 async def _get_chapter_or_404(db, chapter_id: uuid.UUID) -> Chapter:
     r = await db.execute(select(Chapter).where(Chapter.id == chapter_id))
     ch = r.scalar_one_or_none()

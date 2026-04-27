@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from app.services.chapter_json import sample_published_v1
+
+
 def _admin_session(client) -> None:
     client.post("/v1/admin/bootstrap", json={"password": "admin-pw-888"})
 
@@ -14,8 +17,11 @@ def _published_chapter_id(client) -> str:
     )
     assert r.status_code == 201
     cid = r.json()["id"]
-    g = client.post(f"/v1/admin/chapters/{cid}/generate")
-    assert g.status_code == 200, g.text
+    patch = client.patch(
+        f"/v1/admin/chapters/{cid}",
+        json={"aiGeneratedDraft": sample_published_v1()},
+    )
+    assert patch.status_code == 200, patch.text
     p = client.post(f"/v1/admin/chapters/{cid}/publish")
     assert p.status_code == 200, p.text
     return cid
@@ -56,6 +62,7 @@ def test_task8_list_get_verify_complete(client) -> None:
     assert body.get("contentStatus") == "published"
     assert body.get("publishedContent", {}).get("version") == 1
     assert body.get("hasCompletedChapter") is False
+    assert body.get("cellsPassed") == []
 
     bad_complete = client.post(
         f"/v1/student/chapters/{ch_id}/complete", headers=h
@@ -104,6 +111,11 @@ def test_task8_list_get_verify_complete(client) -> None:
     )
     assert c2_ok.json().get("passed") is True
 
+    ch_with_passes = client.get(f"/v1/student/chapters/{ch_id}", headers=h).json()[
+        "chapter"
+    ]
+    assert set(ch_with_passes.get("cellsPassed", [])) == {"c1", "c2"}
+
     comp = client.post(
         f"/v1/student/chapters/{ch_id}/complete", headers=h
     )
@@ -120,3 +132,35 @@ def test_task8_list_get_verify_complete(client) -> None:
     assert lst_done.json()["chapters"][0].get("practiceStatus") == "submitted"
     ch_one = client.get(f"/v1/student/chapters/{ch_id}", headers=h).json()["chapter"]
     assert ch_one.get("hasCompletedChapter") is True
+
+    un = client.post(f"/v1/student/chapters/{ch_id}/uncomplete", headers=h)
+    assert un.status_code == 200
+    assert un.json().get("ok") is True
+    assert un.json().get("withdrawn") is True
+
+    lst_back = client.get("/v1/student/chapters", headers=h)
+    assert lst_back.json()["chapters"][0].get("practiceStatus") == "inProgress"
+    ch_two = client.get(f"/v1/student/chapters/{ch_id}", headers=h).json()["chapter"]
+    assert ch_two.get("hasCompletedChapter") is False
+
+    un2 = client.post(f"/v1/student/chapters/{ch_id}/uncomplete", headers=h)
+    assert un2.status_code == 200
+    j2 = un2.json()
+    assert j2.get("ok") is False
+    assert j2.get("withdrawn") is False
+    assert j2.get("detail") == "not_completed"
+
+
+def test_task8_uncomplete_requires_auth(client) -> None:
+    ch_id = _published_chapter_id(client)
+    r = client.post(f"/v1/student/chapters/{ch_id}/uncomplete")
+    assert r.status_code == 401
+
+
+def test_task8_uncomplete_unknown_chapter(client) -> None:
+    _published_chapter_id(client)
+    tok = _student_token(client)
+    h = {"Authorization": f"Bearer {tok}"}
+    bad_id = "00000000-0000-0000-0000-000000000099"
+    r = client.post(f"/v1/student/chapters/{bad_id}/uncomplete", headers=h)
+    assert r.status_code == 404

@@ -1,96 +1,426 @@
 {% extends "teacher/base.html" %}
+{% from "teacher/macros.html" import content_status_zh %}
 {% block title %}{{ ch.title }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="/static/jupyter-cells.css" />
 <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+<style>
+  /* Two logical rows: shared header band (equal height per row), then paired textareas (equal height). */
+  .draft-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(2.5rem, auto) minmax(20rem, 1fr);
+    column-gap: 1.25rem;
+    row-gap: 0.25rem;
+    align-items: stretch;
+  }
+  .draft-col { display: contents; }
+  .draft-col--template .draft-template-head {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    min-height: 2.5rem;
+  }
+  .draft-col--template .draft-template-head > label { margin: 0; }
+  .draft-col--template #btn-copy-template { margin-left: auto; }
+  .draft-col--template #id-draft-template {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 20rem;
+    height: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
+  }
+  .draft-col--draft > label[for="id-draft"] {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+  }
+  .draft-col--draft #id-draft {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 20rem;
+    height: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
+  }
+  @media (max-width: 56rem) {
+    .draft-dual {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .draft-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .draft-col--template .draft-template-head,
+    .draft-col--template #id-draft-template,
+    .draft-col--draft > label[for="id-draft"],
+    .draft-col--draft #id-draft {
+      grid-column: unset;
+      grid-row: unset;
+      height: auto;
+    }
+  }
+  .draft-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 0 0 1rem 0;
+  }
+  .draft-footer-note { color: var(--muted); font-size: 0.85rem; margin: 0.75rem 0 0; }
+  .copy-template-btn { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+  .copy-template-btn.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .copy-template-btn.copy-fail { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .bar-title-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; width: 100%; }
+  .bar-title-row h1 { margin: 0; }
+  .chapter-title-view { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+  .chapter-title-view h1 { flex: 0 1 auto; min-width: 0; }
+  .btn-icon.chapter-title-edit-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5rem; height: 1.5rem; padding: 0; flex-shrink: 0;
+    background: transparent; border: 1px solid #334155; border-radius: 4px; color: var(--muted);
+    cursor: pointer; line-height: 1;
+  }
+  .btn-icon.chapter-title-edit-btn:hover, .btn-icon.chapter-title-edit-btn:focus-visible {
+    color: var(--accent); border-color: var(--accent); outline: none;
+  }
+  .bar-title-row .chapter-title-rename-input {
+    width: auto; min-width: 8rem; max-width: min(32rem, 100%);
+    flex: 1 1 12rem;
+  }
+  .bar-title-row.chapter-title-row-editing .chapter-title-view { display: none; }
+  .bar-title-row.chapter-title-row-editing .chapter-title-rename-input { display: block; }
+  .bar-title-row:not(.chapter-title-row-editing) .chapter-title-rename-input { display: none; }
+  .chapter-edit-bottom-nav {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #2d3a4d;
+  }
+</style>
 {% endblock %}
 {% block body %}
 <div class="bar">
-  <h1>{{ ch.title }} <small style="color:var(--muted)"><code>{{ ch.slug }}</code></small></h1>
+  <div class="bar-title-row" id="chapter-title-bar">
+    <div class="chapter-title-view" id="chapter-title-view">
+      <h1 id="chapter-title-heading">{{ ch.title }}</h1>
+      <button type="button" class="btn-icon chapter-title-edit-btn" id="btn-rename-chapter" aria-label="重命名">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+    <input type="text" id="chapter-title-input" class="chapter-title-rename-input"
+      data-rename-url="/teacher/chapters/{{ ch.id }}/rename"
+      autocomplete="off" spellcheck="false" />
+  </div>
   <div class="bar-actions">
     <a class="btn secondary" href="/teacher">返回列表</a>
   </div>
 </div>
 
-<div id="flash" class="card" style="min-height:2.5rem">
-{% if ui_flash %}
-<p class="{% if ui_flash_level == 'ok' %}flash-ok{% else %}flash-err{% endif %}" role="status">{% if ui_flash_level == 'ok' %}✓{% else %}✗{% endif %} {{ ui_flash }}</p>
-{% endif %}
+<div id="flash" role="status" aria-live="polite">
+  {% if ui_flash %}
+  <div class="card">
+    <p class="{% if ui_flash_level == 'ok' %}flash-ok{% elif ui_flash_level == 'warn' %}flash-warn{% else %}flash-err{% endif %}" role="status">{% if ui_flash_level == 'ok' %}✓{% elif ui_flash_level == 'warn' %}!{% else %}✗{% endif %} {{ ui_flash }}</p>
+  </div>
+  {% endif %}
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">章素材（<code>sourceMaterial</code>）</h2>
-  <p>给「从素材用 LLM 生成」用的说明或原文（纯文本，不是上面的章 JSON）。先点「保存章素材」，再点下面的「从素材用 LLM 生成」。MOCK 模式也会读这段文字（同时可仍返回固定示范草稿）。</p>
-  <form
-    id="fmat"
-    method="post"
-    action="/teacher/chapters/{{ ch.id }}/save-material"
-    hx-post="/teacher/chapters/{{ ch.id }}/save-material"
-    hx-target="#flash"
-    hx-swap="innerHTML"
-  >
-    <label for="sm">素材正文</label>
-    <textarea id="sm" name="source_material" rows="6" placeholder="例如：本课教学目标、引用的课文段落、要出的题型说明…">{{ source_material_text }}</textarea>
-    <p><button type="submit" class="secondary">保存章素材</button></p>
-  </form>
-</div>
-
-<div class="card">
-  <h2 style="margin-top:0">草稿 JSON（<code>ai_generated_draft</code>）</h2>
-  <p>须符合 <strong>version 1</strong> 章 JSON；可粘贴后保存，再点发布。若 HTMX（外网脚本）未加载，仍可用下面表单的常规提交；成功后会返回本页并显示提示。</p>
-  <form
-    id="fdraft"
-    method="post"
-    action="/teacher/chapters/{{ ch.id }}/save-draft"
-    hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
-    hx-target="#flash"
-    hx-swap="innerHTML"
-  >
-    <textarea name="draft" rows="18">{{ draft_json }}</textarea>
-    <p>
-      <button type="submit">保存草稿</button>
-    </p>
-  </form>
-  <p>
+  <h2 style="margin-top:0">章节练习发布</h2>
+  <p>须符合 <strong>version 1</strong> 章 JSON。左侧为只读模板，右侧粘贴其他工具生成的章 JSON。点「保存草稿」仅写入库；点「发布」会<strong>同时提交当前编辑区</strong>里的 JSON 并发布（不必先保存）。「取消发布」可随时点击；有已发布练习时会撤回，学生端将看不到；若无已发布内容会提示。若 HTMX 未加载，表单仍可常规提交。</p>
+  <div class="draft-actions">
     <form
+      id="fdraft"
       method="post"
-      action="/teacher/chapters/{{ ch.id }}/generate"
-      hx-post="/teacher/chapters/{{ ch.id }}/generate"
-      hx-target="#flash"
-      hx-swap="innerHTML"
-      style="display:inline"
+      action="/teacher/chapters/{{ ch.id }}/save-draft"
     >
-      <button type="submit" class="secondary">从素材用 LLM 生成</button>
+      <button
+        type="submit"
+        hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
+        hx-include="#id-draft"
+      >保存草稿</button>
+      <button
+        type="submit"
+        style="background:#16a34a"
+        formaction="/teacher/chapters/{{ ch.id }}/publish"
+        formmethod="post"
+        hx-post="/teacher/chapters/{{ ch.id }}/publish"
+        hx-include="#id-draft"
+        hx-target="#flash"
+        hx-swap="innerHTML"
+      >发布</button>
     </form>
     <form
       method="post"
-      action="/teacher/chapters/{{ ch.id }}/publish"
-      hx-post="/teacher/chapters/{{ ch.id }}/publish"
+      action="/teacher/chapters/{{ ch.id }}/unpublish"
+      hx-post="/teacher/chapters/{{ ch.id }}/unpublish"
       hx-target="#flash"
       hx-swap="innerHTML"
-      style="display:inline"
+      hx-confirm="确定取消发布？学生端将看不到本章节练习。"
     >
-      <button type="submit" style="background:#16a34a">发布</button>
+      <button type="submit" style="background:#b91c1c;color:#fff" formnovalidate>
+        取消发布
+      </button>
     </form>
-  </p>
-  <p style="color:var(--muted); font-size:0.85rem">
-    当前状态：<strong>{{ ch.content_status }}</strong>
-    · 章素材见上方 <code>sourceMaterial</code> 区块；MOCK 生章不调用外网 LLM
-  </p>
+  </div>
+  <div class="draft-dual">
+    <div class="draft-col draft-col--template">
+      <div class="draft-template-head">
+        <label for="id-draft-template">章节练习JSON模板</label>
+        <button type="button" class="secondary copy-template-btn" id="btn-copy-template" aria-label="复制 JSON 模板到剪贴板">复制</button>
+      </div>
+      <textarea id="id-draft-template" readonly rows="20" spellcheck="false">{{ draft_template_text|e }}</textarea>
+    </div>
+    <div class="draft-col draft-col--draft">
+      <label for="id-draft">生成的JSON模板请粘贴在这里</label>
+      <textarea id="id-draft" name="draft" form="fdraft" rows="20" spellcheck="false">{{ draft_json|e }}</textarea>
+    </div>
+  </div>
+  <p class="draft-footer-note">
+    当前状态：<strong>{{ content_status_zh(ch.content_status) }}</strong>。发布时以当前编辑区 JSON 为准（与「保存草稿」使用同一份内容）。</p>
 </div>
+<script>
+(function () {
+  var btn = document.getElementById("btn-copy-template");
+  var ta = document.getElementById("id-draft-template");
+  if (!btn || !ta) return;
+  var origLabel = btn.getAttribute("aria-label") || "复制 JSON 模板到剪贴板";
+  var origText = btn.textContent;
+  var timer = null;
+  function setFeedback(copied) {
+    if (timer) clearTimeout(timer);
+    btn.classList.remove("copied", "copy-fail");
+    if (copied) {
+      btn.classList.add("copied");
+      btn.textContent = "已复制";
+      btn.setAttribute("aria-label", "已复制到剪贴板");
+    } else {
+      btn.classList.add("copy-fail");
+      btn.textContent = "失败";
+      btn.setAttribute("aria-label", "复制失败，请重试或手动选择文字复制");
+    }
+    timer = setTimeout(function () {
+      btn.textContent = origText;
+      btn.setAttribute("aria-label", origLabel);
+      btn.classList.remove("copied", "copy-fail");
+      timer = null;
+    }, 1500);
+  }
+  btn.addEventListener("click", function () {
+    var text = ta.value;
+    function fail() {
+      setFeedback(false);
+      try { alert("复制失败，请手动选择文字复制。"); } catch (e) {}
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { setFeedback(true); }).catch(fail);
+      } else {
+        fail();
+      }
+    } catch (e) {
+      fail();
+    }
+  });
+})();
+</script>
+<script>
+(function () {
+  var bar = document.getElementById("chapter-title-bar");
+  var h1 = document.getElementById("chapter-title-heading");
+  var btn = document.getElementById("btn-rename-chapter");
+  var inp = document.getElementById("chapter-title-input");
+  if (!bar || !h1 || !btn || !inp) return;
+  var defTitle = {{ ch.title|tojson }};
+  var renameUrl = (inp.getAttribute("data-rename-url") || "").trim();
+  var saving = false;
+  function showView() {
+    bar.classList.remove("chapter-title-row-editing");
+    h1.textContent = defTitle;
+  }
+  function exitEditToStaticTitle(merged) {
+    defTitle = merged;
+    h1.textContent = merged;
+    bar.classList.remove("chapter-title-row-editing");
+    saving = false;
+  }
+  function showEdit() {
+    bar.classList.add("chapter-title-row-editing");
+    inp.value = defTitle;
+    setTimeout(function () {
+      inp.focus();
+      try { inp.select(); } catch (e) {}
+    }, 0);
+  }
+  function trySave() {
+    if (saving) return;
+    if (!renameUrl) {
+      try { alert("重命名地址缺失。"); } catch (e) {}
+      return;
+    }
+    var t = (inp.value || "").trim();
+    if (!t) {
+      try { alert("标题不能为空。"); } catch (e) {}
+      return;
+    }
+    if (t.length > 255) {
+      try { alert("标题过长（最多 255 个字符）。"); } catch (e) {}
+      return;
+    }
+    saving = true;
+    var willNavigate = false;
+    var reqHeaders = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+    try {
+      reqHeaders["Referer"] = window.location.href;
+    } catch (e) {}
+    fetch(renameUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: reqHeaders,
+      body: new URLSearchParams({ title: t }),
+      redirect: "manual",
+    })
+      .then(function (res) {
+        if (res.status === 301 || res.status === 302 || res.status === 303 || res.status === 307 || res.status === 308) {
+          var loc = res.headers.get("Location");
+          if (loc) {
+            willNavigate = true;
+            var absolute = new URL(loc, window.location.origin).href;
+            try {
+              window.location.assign(absolute);
+            } catch (e) {
+              try { window.location.href = absolute; } catch (e2) {}
+            }
+            setTimeout(function () {
+              if (!bar.classList.contains("chapter-title-row-editing")) return;
+              exitEditToStaticTitle(t);
+              try { window.location.reload(); } catch (e) {}
+            }, 500);
+            return;
+          }
+          willNavigate = true;
+          var u = new URL(window.location.href);
+          u.searchParams.set("renamed", "1");
+          try {
+            window.location.assign(u.href);
+          } catch (e) {
+            try { window.location.href = u.href; } catch (e2) {}
+          }
+          setTimeout(function () {
+            if (!bar.classList.contains("chapter-title-row-editing")) return;
+            exitEditToStaticTitle(t);
+            try { window.location.reload(); } catch (e) {}
+          }, 500);
+          return;
+        }
+        if (res.status === 0) {
+          willNavigate = true;
+          try { window.location.reload(); } catch (e) {}
+          setTimeout(function () {
+            if (!bar.classList.contains("chapter-title-row-editing")) return;
+            exitEditToStaticTitle(t);
+            try { window.location.reload(); } catch (e) {}
+          }, 500);
+          return;
+        }
+        if (res.status === 404) {
+          return res.text().then(function (txt) {
+            showView();
+            try { alert((txt && txt.trim()) || "章不存在。"); } catch (e) {}
+          });
+        }
+        if (res.status >= 400) {
+          return res.text().then(function (txt) {
+            showView();
+            try { alert((txt && txt.trim()) || "重命名失败。"); } catch (e) {}
+          });
+        }
+        showView();
+        try { alert("重命名失败。"); } catch (e) {}
+      })
+      .catch(function (err) {
+        try { console.error("chapter rename", err); } catch (e) {}
+        showView();
+        try {
+          alert("重命名失败：" + (err && err.message ? err.message : "网络或浏览器错误。"));
+        } catch (e2) {}
+      })
+      .finally(function () {
+        if (!willNavigate) {
+          saving = false;
+        }
+      });
+  }
+  btn.addEventListener("click", function () { showEdit(); });
+  inp.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") {
+      if (ev.isComposing) return;
+      if (ev.repeat) return;
+      ev.preventDefault();
+      trySave();
+    } else if (ev.key === "Escape") {
+      ev.preventDefault();
+      showView();
+    }
+  });
+  inp.addEventListener("blur", function () {
+    if (!bar.classList.contains("chapter-title-row-editing")) return;
+    if (saving) return;
+    var t = (inp.value || "").trim();
+    if (t === defTitle) {
+      showView();
+      return;
+    }
+    if (!t) {
+      try { alert("标题不能为空。"); } catch (e) {}
+      showView();
+      return;
+    }
+    trySave();
+  });
+  window.addEventListener(
+    "submit",
+    function (ev) {
+      if (document.activeElement === inp) ev.preventDefault();
+    },
+    true
+  );
+})();
+</script>
 
-{% if published_json and ch.published_content and ch.published_content.get('version') == 1 and ch.published_content.get('blocks') %}
+{% if has_preview %}
 <div class="card">
-  <h2 style="margin-top:0">发布预览（Notebook 式，与学生端同结构，只读）</h2>
-  <p>与 design 学生端 Pyodide 练习一致；此处不执行代码。要改内容请调草稿后重新发布。</p>
-  <p class="jnb-teacher-banner">与下方「已发布 JSON」为同一份数据；本区为易读版。</p>
+  <h2 style="margin-top:0">发布预览</h2>
+  {% if draft_preview is not none %}
+  <p class="jnb-teacher-banner" style="background:#f0f9ff;border:1px solid #bae6fd">以下为当前草稿通过校验的预览，学生端以「发布」后为准。</p>
+  {% if draft_preview_warnings %}
+  <p class="draft-footer-note">校验提示：{{ draft_preview_warnings | join('；') }}</p>
+  {% endif %}
+  {% elif invalid_draft_for_preview %}
+  <p class="draft-footer-note">草稿未通过发布校验，预览显示上次已发布（或无）。</p>
+  {% else %}
+  <p class="jnb-teacher-banner">学生端章练习即此结构。</p>
+  {% endif %}
   <div class="teacher-jnb jnb-teacher-embed">
     <div class="jnb-page">
     <h1 class="jnb-chapter-h1">{{ ch.title }}</h1>
-    {% if ch.published_content.get('chapterIntroHtml') %}
-    <div class="jnb-md-cell">{{ ch.published_content.get('chapterIntroHtml')|safe }}</div>
+    {% if preview_content.get('chapterIntroHtml') %}
+    <div class="jnb-md-cell">{{ preview_content.get('chapterIntroHtml')|safe }}</div>
     {% endif %}
-    {% for b in ch.published_content['blocks'] %}
+    {% for b in preview_content['blocks'] %}
     {% set bi = loop.index0 %}
     {% set sec = b.get('sectionTitle') or '知识点 ' ~ (bi + 1) %}
     <div class="jnb-kp">
@@ -105,22 +435,26 @@
       <div class="jnb-expected">
         <div class="jnb-expected-h">题目期望的输出或结果</div>
         <div class="jnb-expected-body">{{ g.get('expectedOutput') }}</div>
+        {% if g.get('expectedImageDataUrl') %}
+        <img class="jnb-expected-img" src="{{ g.get('expectedImageDataUrl') }}" alt="{{ g.get('expectedImageAlt') or '基础题参考图' }}" />
+        {% endif %}
+      </div>
+      {% elif g.get('expectedImageDataUrl') %}
+      <div class="jnb-expected">
+        <div class="jnb-expected-h">题目期望的输出或结果</div>
+        <img class="jnb-expected-img" src="{{ g.get('expectedImageDataUrl') }}" alt="{{ g.get('expectedImageAlt') or '基础题参考图' }}" />
       </div>
       {% endif %}
       <div class="jnb-code-row"><span class="jnb-prompt jnb-prompt--code">代码</span>
-        <div class="jnb-code-col"><pre class="jnb-input-ro" style="margin:0">{{ g.get('starterCode', '') }}</pre></div>
+        <div class="jnb-code-col">
+          {% set guide_show = (g.get('referenceAnswer') or g.get('codeBackdropCode') or g.get('starterCode')) %}
+          {% if guide_show %}
+          <pre class="jnb-input-ro" style="margin:0">{{ guide_show }}</pre>
+          {% else %}
+          <p class="jnb-cell-desc" style="padding-left:0">（无基础题参考代码）</p>
+          {% endif %}
+        </div>
       </div>
-      {% if g.get('referenceAnswer') %}
-      <div class="jnb-ref" style="margin-left:0.25rem">
-        <div class="jnb-ref-h">标准答案（发布给学生）</div>
-        <pre class="jnb-ref-pre">{{ g.get('referenceAnswer', '') }}</pre>
-      </div>
-      {% endif %}
-      {% set gpr = g.get('passRule') or {} %}
-      <p class="jnb-pass">判定标准：模式 <code>{{ gpr.get('mode', '') }}</code>
-        {% if gpr.get('expectedSubstring') %}，stdout 须含 <code>{{ gpr.get('expectedSubstring') }}</code>{% endif %}
-        {% if gpr.get('assertCode') %}，断言 <code>{{ gpr.get('assertCode', '')[:200] }}{% if (gpr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
-      </p>
       {% endif %}
       {% set ex = b.get('extensionCell') %}
       {% if ex %}
@@ -131,22 +465,26 @@
       <div class="jnb-expected">
         <div class="jnb-expected-h">题目期望的输出或结果</div>
         <div class="jnb-expected-body">{{ ex.get('expectedOutput') }}</div>
+        {% if ex.get('expectedImageDataUrl') %}
+        <img class="jnb-expected-img" src="{{ ex.get('expectedImageDataUrl') }}" alt="{{ ex.get('expectedImageAlt') or '扩展题参考图' }}" />
+        {% endif %}
+      </div>
+      {% elif ex.get('expectedImageDataUrl') %}
+      <div class="jnb-expected">
+        <div class="jnb-expected-h">题目期望的输出或结果</div>
+        <img class="jnb-expected-img" src="{{ ex.get('expectedImageDataUrl') }}" alt="{{ ex.get('expectedImageAlt') or '扩展题参考图' }}" />
       </div>
       {% endif %}
       <div class="jnb-code-row"><span class="jnb-prompt jnb-prompt--code">代码</span>
-        <div class="jnb-code-col">{% if ex.get('starterCode') %}<pre class="jnb-input-ro" style="margin:0">{{ ex.get('starterCode') }}</pre>{% else %}<p class="jnb-cell-desc" style="padding-left:0">（无起始代码，由学生自写）</p>{% endif %}</div>
+        <div class="jnb-code-col">
+        {% set ex_show = (ex.get('referenceAnswer') or ex.get('starterCode')) %}
+        {% if ex_show %}
+          <pre class="jnb-input-ro" style="margin:0">{{ ex_show }}</pre>
+        {% else %}
+          <p class="jnb-cell-desc" style="padding-left:0">（无起始代码与参考，由学生自写）</p>
+        {% endif %}
+        </div>
       </div>
-      {% if ex.get('referenceAnswer') %}
-      <div class="jnb-ref" style="margin-left:0.25rem">
-        <div class="jnb-ref-h">标准答案（发布给学生）</div>
-        <pre class="jnb-ref-pre">{{ ex.get('referenceAnswer', '') }}</pre>
-      </div>
-      {% endif %}
-      {% set epr = ex.get('passRule') or {} %}
-      <p class="jnb-pass">判定标准：模式 <code>{{ epr.get('mode', '') }}</code>
-        {% if epr.get('expectedSubstring') %}，stdout 须含 <code>{{ epr.get('expectedSubstring') }}</code>{% endif %}
-        {% if epr.get('assertCode') %}，断言 <code>{{ epr.get('assertCode', '')[:200] }}{% if (epr.get('assertCode', '')|length) > 200 %}…{% endif %}</code>{% endif %}
-      </p>
       {% endif %}
     </div>
     {% endfor %}
@@ -155,17 +493,14 @@
 </div>
 {% endif %}
 
-{% if published_json %}
-<div class="card">
-  <h2 style="margin-top:0">已发布 JSON（<code>publishedContent</code>，只读）</h2>
-  <p>与 API / 学生端数据一致。改版面以「发布预览」为准；本框便于复制或排查格式。</p>
-  <label for="pubro">学生可见章 JSON</label>
-  <textarea id="pubro" readonly rows="20" class="ro">{{ published_json }}</textarea>
-</div>
-{% elif ch.content_status == 'published' %}
+{% if ch.content_status == 'published' and ch.published_content is none %}
 <div class="card">
   <h2 style="margin-top:0">已发布内容</h2>
   <p class="flash-err">状态为已发布，但库中无 <code>publishedContent</code> 记录（异常，请用 API 或联系维护）。</p>
 </div>
 {% endif %}
+
+<nav class="bar-actions chapter-edit-bottom-nav" aria-label="页面底部">
+  <a class="btn secondary" href="/teacher">返回列表</a>
+</nav>
 {% endblock %}

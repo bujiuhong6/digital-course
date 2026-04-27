@@ -19,9 +19,9 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 学生桌面或 Vite  dev 可能使用 `localhost` / `127.0.0.1` 的**不同端口**（1420、5173 等）。默认开启 **`CORS_DEV_LOCALHOST_REGEX=true`**（可在 `.env` 覆盖）：对 `http(s)://localhost`、`127.0.0.1`、`tauri.localhost` **任意端口** 允许跨域。上线时可将 `CORS_DEV_LOCALHOST_REGEX=false` 并仅保留你站点域名。
 
-## OpenAI 兼容 LLM（推荐：OpenRouter）
+## OpenAI 兼容 LLM
 
-章「从素材生成」与学生 **AI 学习助手** 均使用 `POST {base}/v1/chat/completions`，`Authorization: Bearer <API Key>`。
+章「从素材生成」与学生 **AI 学习助手** 均使用 OpenAI 兼容 Chat Completions，`Authorization: Bearer <API Key>`。
 
 ### OpenRouter
 
@@ -31,7 +31,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```env
 CHAPTER_GEN_MOCK=0
 LLM_BASE_URL=https://openrouter.ai/api
-LLM_API_KEY=sk-or-v1-...
+LLM_API_KEY=<your-openrouter-api-key>
 CHAPTER_GEN_MODEL=openai/gpt-4o-mini
 CHAT_MODEL=openai/gpt-4o-mini
 ```
@@ -45,9 +45,9 @@ CHAT_MODEL=openai/gpt-4o-mini
 - `OPENROUTER_HTTP_REFERER`（对应 `HTTP-Referer`）
 - `OPENROUTER_TITLE`（对应 `X-OpenRouter-Title`）
 
-### 其他厂商（如硅基流动）
+### 其他厂商（如硅基流动、DeepSeek）
 
-同样为 OpenAI 兼容时，将 `LLM_BASE_URL` 设为**不含**路径 `/v1` 的根（代码会拼 `/v1/chat/completions`）。模型名以厂商控制台为准。
+硅基流动等多数 OpenAI 兼容厂商，将 `LLM_BASE_URL` 设为**不含**路径 `/v1` 的根（代码会拼 `/v1/chat/completions`）。DeepSeek 使用官方基址 `https://api.deepseek.com`，本服务会请求 `https://api.deepseek.com/chat/completions`。模型名以厂商控制台为准，例如 `deepseek-v4-flash`。
 
 **Mock 开发**：保留 `CHAPTER_GEN_MOCK=1` 时，章生成仍返回固定示范 JSON；学生聊天在未配置任何 LLM 基址时会返回带 `mock: true` 的 JSON 响应。
 

@@ -73,6 +73,15 @@
   line-height: 1.5;
   white-space: pre-wrap;
 }
+.jnb-expected-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 0.55rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  background: #fff;
+}
 .jnb-code-row {
   display: flex;
   flex-direction: row;
@@ -249,6 +258,83 @@
   min-width: 0;
 }
 
+/* 备用：独立提示区。当前基础练习主交互使用下方的同框底纹。 */
+.jnb-code-hint-panel {
+  margin: 0 0 0.5rem 0;
+  padding: 0.55rem 0.7rem;
+  box-sizing: border-box;
+  background: var(--jnb-code-bg);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font: inherit;
+  line-height: 1.45;
+}
+.jnb-code-hint-label {
+  color: #b91c1c;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+.jnb-code-hint-code {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #94a3b8;
+  font: inherit;
+  line-height: 1.45;
+}
+
+/* 基础练习：红字提示 + 灰字参考与输入区在同一个框；聚焦或输入后由 React 隐藏底纹。 */
+.jnb-code-col--backdrop {
+  position: relative;
+  background: var(--jnb-code-bg);
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+.jnb-code-backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 0;
+  min-height: 5rem;
+  padding: 0.55rem 0.7rem;
+  box-sizing: border-box;
+  pointer-events: none;
+  user-select: none;
+  font: inherit;
+  line-height: 1.45;
+}
+.jnb-code-backdrop-label {
+  color: #b91c1c;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+.jnb-code-backdrop-code {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #94a3b8;
+  font: inherit;
+  line-height: 1.45;
+}
+textarea.jnb-input.jnb-input--backdrop-on {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  border: none;
+  box-shadow: none;
+  border-radius: 4px;
+}
+textarea.jnb-input.jnb-input--backdrop-on:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 textarea.jnb-input {
   display: block;
   width: 100%;
@@ -314,6 +400,15 @@ pre.jnb-input-ro {
 .jnb-run-row button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.jnb-run-row button.jnb-btn-secondary {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 500;
+}
+.jnb-run-row button.jnb-btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
 }
 
 /* 过关说明 */
@@ -436,26 +531,6 @@ pre.jnb-input-ro {
   overflow: auto;
 }
 
-/* 过关规则（与提示区分：左侧强调条） */
-.jnb-pass {
-  margin: 0.45rem 0 0.5rem;
-  padding: 0.45rem 0.75rem 0.5rem 0.85rem;
-  border-left: 3px solid var(--jnb-accent);
-  background: #f1f5f9;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: #475569;
-  line-height: 1.55;
-  font-family: system-ui, sans-serif;
-}
-.jnb-pass code {
-  background: #e2e8f0;
-  padding: 0.1rem 0.3rem;
-  border-radius: 3px;
-  font-size: 0.78rem;
-  color: #1e293b;
-}
-
 /* 本章完成区 */
 .jnb-footer-actions {
   margin-top: 1.5rem;
@@ -467,6 +542,17 @@ pre.jnb-input-ro {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem;
+}
+.jnb-footer-btns-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.jnb-footer-back {
+  margin-left: auto;
 }
 .jnb-footer-actions button {
   background: #1e40af;

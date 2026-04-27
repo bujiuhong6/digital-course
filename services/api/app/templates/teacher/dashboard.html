@@ -1,4 +1,5 @@
 {% extends "teacher/base.html" %}
+{% from "teacher/macros.html" import content_status_zh %}
 {% block title %}章节练习内容设计{% endblock %}
 {% block body %}
 <div class="bar">
@@ -8,6 +9,10 @@
     <a class="btn secondary" href="/teacher/classes">班级{% if class_count is defined and class_count %}（{{ class_count }}）{% endif %}</a>
   </div>
 </div>
+
+{% if ui_flash %}
+  <p class="{% if ui_flash_level == 'ok' %}flash-ok{% else %}flash-err{% endif %}" role="status">{% if ui_flash_level == 'ok' %}✓{% else %}✗{% endif %} {{ ui_flash }}</p>
+{% endif %}
 
 <div class="card">
   <h2 style="margin-top:0">新建章节练习</h2>
@@ -24,20 +29,23 @@
   <p>暂无。请先新建。</p>
   {% else %}
   <table>
-    <thead><tr><th>标题</th><th>slug</th><th>状态</th><th></th></tr></thead>
+    <thead><tr><th>标题</th><th>状态</th><th></th></tr></thead>
     <tbody>
       {% for c in chapters %}
       <tr>
-        <td><a href="/teacher/chapters/{{ c.id }}/edit">{{ c.title }}</a></td>
-        <td><code>{{ c.slug }}</code></td>
-        <td>{{ c.content_status }}</td>
+        <td class="chapter-title-cell row-actions">
+          <a class="chapter-title-link" href="/teacher/chapters/{{ c.id }}/edit">{{ c.title }}</a>
+          <button type="button" class="chapter-rename-btn" title="重命名" aria-label="重命名"
+            data-rename-url="/teacher/chapters/{{ c.id }}/rename"
+            data-current-title="{{ c.title | e }}">✎</button>
+        </td>
+        <td>{{ content_status_zh(c.content_status) }}</td>
         <td class="row-actions">
           <a href="/teacher/chapters/{{ c.id }}/edit">编辑</a>
           {% if c.content_status == 'published' %}
           <a href="/teacher/chapters/{{ c.id }}/completions" class="muted" style="margin-left:0.35rem">完成记录</a>
-          <span class="muted">· 已发布</span>
           {% else %}
-          <span class="muted">· 草稿</span>
+          <span class="muted">· {{ content_status_zh(c.content_status) }}</span>
           {% endif %}
           <form method="post" action="/teacher/chapters/{{ c.id }}/delete" style="display:inline;margin:0" onsubmit="return confirm('确定删除此章？学生端将不可见；与章相关的练习记录会一并删除。');">
             <button type="submit" class="link-danger" title="删除章">删除</button>
@@ -49,4 +57,101 @@
   </table>
   {% endif %}
 </div>
+<script>
+(function () {
+  var active = { cell: null, html: null };
+  function clearActive() {
+    if (active.cell) {
+      active.cell.innerHTML = active.html;
+      active.cell = null;
+      active.html = null;
+    }
+  }
+  function trySave(input, renameUrl) {
+    var t = (input.value || '').trim();
+    if (!t) {
+      try { alert('标题不能为空。'); } catch (e) {}
+      return;
+    }
+    if (t.length > 255) {
+      try { alert('标题过长（最多 255 个字符）。'); } catch (e) {}
+      return;
+    }
+    var body = new URLSearchParams({ title: t }).toString();
+    fetch(renameUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body,
+      redirect: 'manual',
+    }).then(function (res) {
+      if (res.status === 301 || res.status === 302 || res.status === 303 || res.status === 307 || res.status === 308) {
+        var loc = res.headers.get('Location');
+        if (loc) {
+          clearActive();
+          window.location.assign(new URL(loc, window.location.href).href);
+        }
+        return;
+      }
+      if (res.status === 0) {
+        try { window.location.reload(); } catch (e) {}
+        return;
+      }
+      if (res.status === 404) {
+        return res.text().then(function (txt) {
+          try { alert((txt && txt.trim()) || '章不存在。'); } catch (e) {}
+        });
+      }
+      if (res.status >= 400) {
+        return res.text().then(function (txt) {
+          try { alert((txt && txt.trim()) || '重命名失败。'); } catch (e) {}
+        });
+      }
+      try { alert('重命名失败。'); } catch (e) {}
+    }).catch(function () {
+      try { alert('重命名失败。'); } catch (e) {}
+    });
+  }
+  function onClick(e) {
+    var btn = e.target && e.target.closest && e.target.closest('.chapter-rename-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var cell = btn.closest('td.chapter-title-cell');
+    if (!cell) return;
+    var renameUrl = btn.getAttribute('data-rename-url') || '';
+    if (!renameUrl) return;
+    var link = cell.querySelector('a.chapter-title-link') || cell.querySelector('a[href$="/edit"]') || cell.querySelector('a');
+    var cur = btn.getAttribute('data-current-title') || (link && link.textContent) || '';
+    clearActive();
+    active.cell = cell;
+    active.html = cell.innerHTML;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'chapter-title-inline-rename';
+    input.value = cur;
+    input.setAttribute('autocomplete', 'off');
+    cell.textContent = '';
+    cell.appendChild(input);
+    setTimeout(function () {
+      input.focus();
+      try { input.select(); } catch (e2) {}
+    }, 0);
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        trySave(input, renameUrl);
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        clearActive();
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { document.addEventListener('click', onClick, false); });
+  } else {
+    document.addEventListener('click', onClick, false);
+  }
+})();
+</script>
 {% endblock %}

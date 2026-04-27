@@ -7,8 +7,8 @@ _DEFAULT_STUDENT_PASSWORD_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
 def normalize_openai_compat_base_url(url: str) -> str:
     """
-    章生成与聊天均拼接 `{base}/v1/chat/completions`；若把官方示例里的
-    `.../v1` 写进 `LLM_BASE_URL`，会重复为 `/v1/v1/...`。
+    默认 OpenAI 兼容厂商使用 `{base}/v1/chat/completions`；若把官方示例里的
+    `.../v1` 写进 `LLM_BASE_URL`，归一化后由 URL 构造函数统一补路径。
     这里去掉尾部的 `/v1` 与尾斜杠；空串保持空。
     """
     s = (url or "").strip()
@@ -18,6 +18,13 @@ def normalize_openai_compat_base_url(url: str) -> str:
     if s.lower().endswith("/v1"):
         s = s[:-3].rstrip("/")
     return s
+
+
+def openai_compat_chat_completions_url(base_url_normalized: str) -> str:
+    base = normalize_openai_compat_base_url(base_url_normalized)
+    if base.lower() == "https://api.deepseek.com":
+        return f"{base}/chat/completions"
+    return f"{base}/v1/chat/completions"
 
 
 class Settings(BaseSettings):

@@ -1,5 +1,9 @@
-{% if level == "ok" %}
-<p class="flash-ok">✓ {{ message }}</p>
-{% else %}
-<p class="flash-err">✗ {{ message }}</p>
-{% endif %}
+<div class="card">
+  {% if level == "ok" %}
+  <p class="flash-ok" role="status">✓ {{ message }}</p>
+  {% elif level == "warn" %}
+  <p class="flash-warn" role="status">! {{ message }}</p>
+  {% else %}
+  <p class="flash-err" role="status">✗ {{ message }}</p>
+  {% endif %}
+</div>

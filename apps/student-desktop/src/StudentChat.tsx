@@ -72,7 +72,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
         <span className="sd-chat-fab-icon" aria-hidden>
           ✦
         </span>
-        <span>Chat</span>
+        <span>AI学习助手</span>
       </button>
       {open && (
         <div className="sd-chat-backdrop" aria-hidden onClick={() => setOpen(false)} />
@@ -125,10 +125,18 @@ export function StudentChat({ chapterId, getContext }: Props) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
+              if (e.key !== "Enter" || e.shiftKey) {
+                return;
               }
+              // 中文等 IME：用回车确认候选词/临时英文时不要当「发送」
+              if (e.nativeEvent.isComposing) {
+                return;
+              }
+              if ((e.nativeEvent as KeyboardEvent & { keyCode?: number }).keyCode === 229) {
+                return;
+              }
+              e.preventDefault();
+              void send();
             }}
           />
           <button
