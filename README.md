@@ -125,4 +125,4 @@ pnpm build
 
 - 不提交 `services/api/.env`、`apps/student-desktop/.env`、SQLite 数据库、虚拟环境、缓存和本地截图。
 - 推送前可用 `git status --short` 和敏感词扫描确认没有 API Key。
-- `services/api/seeds/chapters.json` 是课程内容来源。运行 `scripts/initialize_content_db.py` 会保留这些章节并清空运行时数据。
+- `AI智能预习`、`AI课堂助教`、`AI课后练习` 属于程序设计好的课程内容。运行 `scripts/initialize_content_db.py` 默认只补齐缺失 seed，并清空学生、名单、班级、提交记录等运行时数据；不会覆盖或删除已有三类课程内容。

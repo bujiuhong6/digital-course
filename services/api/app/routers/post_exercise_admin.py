@@ -48,7 +48,7 @@ def _post_exercise_edit_flash(request: Request) -> tuple[str | None, str | None]
     if qp.get("rename_err") == "1":
         return "标题无效（须为 1～255 个非空字符）。", "error"
     if qp.get("unpub_ok") == "1":
-        return "已取消发布，学生端暂时看不到本课后练习。", "ok"
+        return "已取消发布，学生端暂时看不到本课后作业。", "ok"
     if qp.get("unpub_err") == "1":
         return "当前不是已发布状态。", "warn"
     return None, None
@@ -117,8 +117,8 @@ async def page_post_exercises(request: Request, _t: CurrentTeacher, db: DBSessio
 
 
 @router.post("/teacher/post-exercises/new")
-async def post_exercise_new(_t: CurrentTeacher, db: DBSession, title: str = Form("新课后练习")):
-    ex = PostExercise(title=title.strip() or "新课后练习", status="draft")
+async def post_exercise_new(_t: CurrentTeacher, db: DBSession, title: str = Form("新课后作业")):
+    ex = PostExercise(title=title.strip() or "新课后作业", status="draft")
     db.add(ex)
     await db.flush()
     return RedirectResponse(f"/teacher/post-exercises/{ex.id}/edit", status_code=303)

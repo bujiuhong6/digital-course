@@ -227,7 +227,7 @@ async def post_exercise_chat(
         for m in body.messages[-20:]
     )
     prompt = (
-        f"课后练习上下文：\n{context}\n\n"
+        f"课后作业上下文：\n{context}\n\n"
         f"当前题目：{body.question_id or '未指定'}\n"
         f"学生当前答案：\n{body.current_answer or ''}\n\n"
         f"对话：\n{user_msgs}"
@@ -237,7 +237,7 @@ async def post_exercise_chat(
         "messages": [
             {
                 "role": "system",
-                "content": "你是课后练习辅导助手。给提示和引导，避免直接替学生完成整份答案。",
+                "content": "你是课后作业辅导助手。给提示和引导，避免直接替学生完成整份答案。",
             },
             {"role": "user", "content": prompt},
         ],

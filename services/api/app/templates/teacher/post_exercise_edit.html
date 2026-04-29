@@ -247,7 +247,7 @@
 
 <div class="card">
   <div class="section-header">
-    <h2>课后练习发布</h2>
+    <h2>课后作业发布</h2>
   </div>
   <div class="publish-toolbar">
     <form
@@ -281,18 +281,18 @@
       hx-post="/teacher/post-exercises/{{ exercise.id }}/unpublish"
       hx-target="#flash"
       hx-swap="innerHTML"
-      hx-confirm="确定取消发布？学生端将看不到本课后练习。"
+      hx-confirm="确定取消发布？学生端将看不到本课后作业。"
     >
       <button type="submit" class="btn-danger-solid" formnovalidate>
         取消发布
       </button>
     </form>
-    <a class="btn secondary chapter-toolbar-back" href="/teacher/post-exercises">返回课后练习列表</a>
+    <a class="btn secondary chapter-toolbar-back" href="/teacher/post-exercises">返回课后作业列表</a>
   </div>
   <div class="draft-dual">
     <div class="draft-col draft-col--template">
       <div class="draft-template-head">
-        <label for="id-draft-template">课后练习JSON模板</label>
+        <label for="id-draft-template">课后作业JSON模板</label>
         <button type="button" class="secondary copy-template-btn" id="btn-copy-template" aria-label="复制 JSON 模板到剪贴板">复制</button>
       </div>
       <textarea id="id-draft-template" readonly rows="20" spellcheck="false">{{ template_json|e }}</textarea>
@@ -309,14 +309,14 @@
 
 <div class="card">
   <h2 style="margin-top:0">发布预览</h2>
-  <p class="jnb-teacher-banner">学生端课后练习即此结构。</p>
+  <p class="jnb-teacher-banner">学生端课后作业即此结构。</p>
   <p id="pe-preview-empty">在右侧粘贴有效 JSON 后，此处会显示题目预览。</p>
   <ul id="pe-preview-list" class="pe-preview-list" hidden></ul>
   <p id="pe-preview-err" class="flash-err" role="status"></p>
 </div>
 
 <div class="chapter-edit-back-wrap">
-  <a class="btn secondary chapter-toolbar-back" href="/teacher/post-exercises">返回课后练习列表</a>
+  <a class="btn secondary chapter-toolbar-back" href="/teacher/post-exercises">返回课后作业列表</a>
 </div>
 
 <script>
@@ -426,7 +426,7 @@
         if (res.status === 404) {
           return res.text().then(function (txt) {
             showView();
-            try { alert((txt && txt.trim()) || "课后练习不存在。"); } catch (e) {}
+            try { alert((txt && txt.trim()) || "课后作业不存在。"); } catch (e) {}
           });
         }
         if (res.status >= 400) {

@@ -304,21 +304,6 @@ function App() {
               <button
                 type="button"
                 className={
-                  screen === "chapters" || screen === "chapter"
-                    ? "sd-module-nav-item is-active"
-                    : "sd-module-nav-item"
-                }
-                onClick={() => void goChapters()}
-              >
-                <BookOpen className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
-                <span className="sd-module-nav-text">
-                  <span className="sd-module-nav-label">AI课堂助教</span>
-                  <span className="sd-module-nav-desc">随堂编程练习</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className={
                   screen === "prestudies" || screen === "prestudy"
                     ? "sd-module-nav-item is-active"
                     : "sd-module-nav-item"
@@ -337,6 +322,21 @@ function App() {
               <button
                 type="button"
                 className={
+                  screen === "chapters" || screen === "chapter"
+                    ? "sd-module-nav-item is-active"
+                    : "sd-module-nav-item"
+                }
+                onClick={() => void goChapters()}
+              >
+                <BookOpen className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
+                <span className="sd-module-nav-text">
+                  <span className="sd-module-nav-label">AI课堂练习</span>
+                  <span className="sd-module-nav-desc">AI助教陪练</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={
                   screen === "postExercises" || screen === "postExercise"
                     ? "sd-module-nav-item is-active"
                     : "sd-module-nav-item"
@@ -348,7 +348,7 @@ function App() {
               >
                 <ClipboardList className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
                 <span className="sd-module-nav-text">
-                  <span className="sd-module-nav-label">AI课后练习</span>
+                  <span className="sd-module-nav-label">AI课后作业</span>
                   <span className="sd-module-nav-desc">测验与 AI 批改</span>
                 </span>
               </button>
@@ -474,13 +474,13 @@ function App() {
       {screen === "chapters" && (
         <Card className="sd-card sd-chapters-card">
           <CardHeader>
-            <CardTitle>AI课堂助教</CardTitle>
+            <CardTitle>AI课堂练习</CardTitle>
             <CardDescription>选择一章进入课堂练习，系统会显示你的学习进度。</CardDescription>
           </CardHeader>
           <CardContent>
           {chapters.length === 0 ? (
             <div className="sd-empty">
-              <p>还没有开放的课堂助教章节。</p>
+              <p>还没有开放的课堂练习章节。</p>
               <span>等老师发布后，这里会出现章节列表。</span>
             </div>
           ) : (
@@ -531,7 +531,7 @@ function App() {
         <section className="sd-chapter-wrap">
           <div className="sd-chapter-topbar">
             <Button type="button" variant="outline" onClick={backToChapters}>
-              返回课堂助教
+              返回课堂练习
             </Button>
             <span>练习会自动保留本地草稿。</span>
           </div>

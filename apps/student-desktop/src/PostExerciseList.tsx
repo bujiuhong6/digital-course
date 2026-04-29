@@ -49,17 +49,17 @@ export function PostExerciseList({ onOpen }: Props) {
   return (
     <Card className="sd-card sd-chapters-card">
       <CardHeader>
-        <CardTitle>AI课后练习</CardTitle>
+        <CardTitle>AI课后作业</CardTitle>
         <CardDescription>完成课后题目后，系统会调用 AI 给出分数和反馈。</CardDescription>
       </CardHeader>
       <CardContent>
         {err && <p className="sd-error-text">{err}</p>}
         {loading ? (
-          <p className="sd-muted">正在加载课后练习…</p>
+          <p className="sd-muted">正在加载课后作业…</p>
         ) : items.length === 0 ? (
           <div className="sd-empty">
-            <p>还没有开放的课后练习。</p>
-            <span>老师发布后，这里会出现练习列表。</span>
+            <p>还没有开放的课后作业。</p>
+            <span>老师发布后，这里会出现作业列表。</span>
           </div>
         ) : (
           <ul className="sd-list">

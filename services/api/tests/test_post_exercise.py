@@ -226,7 +226,7 @@ def test_teacher_post_exercise_pages_and_nav(client) -> None:
     client.post("/v1/admin/bootstrap", json={"password": "pw-123456"})
     page = client.get("/teacher/post-exercises")
     assert page.status_code == 200
-    assert "AI课后练习" in page.text
+    assert "AI课后作业" in page.text
     dash = client.get("/teacher")
     assert "/teacher/post-exercises" in dash.text
 
@@ -238,13 +238,13 @@ def test_teacher_post_exercise_edit_page_has_dual_json_and_preview(client) -> No
     eid = create.json()["exerciseId"]
     page = client.get(f"/teacher/post-exercises/{eid}/edit")
     assert page.status_code == 200
-    assert "课后练习JSON模板" in page.text
+    assert "课后作业JSON模板" in page.text
     assert "生成的JSON模板请粘贴在这里" in page.text
-    assert "课后练习发布" in page.text
+    assert "课后作业发布" in page.text
     assert "保存草稿" in page.text
     assert "发布预览" in page.text
     assert "取消发布" in page.text
-    assert page.text.count("返回课后练习列表") >= 2
+    assert page.text.count("返回课后作业列表") >= 2
 
 
 def test_teacher_post_exercise_preview_includes_answers(client) -> None:

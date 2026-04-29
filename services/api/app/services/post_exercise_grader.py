@@ -34,7 +34,7 @@ async def grade_post_exercise(
         headers["Authorization"] = f"Bearer {cfg.api_key}"
     headers = merge_openai_compat_llm_headers(cfg.base_url, headers)
     prompt = (
-        "你是课程课后练习批改员。请根据题目、标准答案、评分规则和学生答案，"
+        "你是课程课后作业批改员。请根据题目、标准答案、评分规则和学生答案，"
         "输出严格 JSON：{\"score\": 0-100整数, \"feedback\": \"给学生的简短反馈\"}。\n\n"
         f"题目JSON：{json.dumps(content, ensure_ascii=False)}\n\n"
         f"学生答案JSON：{json.dumps(answers, ensure_ascii=False)}"

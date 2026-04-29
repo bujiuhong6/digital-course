@@ -159,12 +159,12 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
     <section className="sd-chapter-wrap">
       <div className="sd-chapter-topbar">
         <Button type="button" variant="outline" onClick={onBack}>
-          返回课后练习
+          返回课后作业
         </Button>
         <span>代码题只提交文本，由 AI 根据标准答案和规则批改。</span>
       </div>
       {loading ? (
-        <p className="sd-muted">正在加载课后练习…</p>
+        <p className="sd-muted">正在加载课后作业…</p>
       ) : err ? (
         <p className="sd-error-text">{err}</p>
       ) : exercise ? (
