@@ -19,6 +19,7 @@ from ..db.models import Chapter, ChapterCompletion, Student
 from ..deps import CurrentTeacher, DBSession
 from ..services.chapter_gen import generate_chapter_draft
 from ..services.chapter_json import validate_for_publish
+from ..services.llm_config import get_effective_chapter_llm_config
 
 router = APIRouter(prefix="/v1/admin/chapters", tags=["admin", "chapters"])
 
@@ -161,9 +162,14 @@ async def generate_chapter(
     _t: CurrentTeacher, db: DBSession, chapter_id: uuid.UUID
 ) -> dict:
     ch = await _get_chapter_or_404(db, chapter_id)
-    parsed, raw, err = await generate_chapter_draft(ch.source_material, model=None)
+    llm_cfg = await get_effective_chapter_llm_config(db)
+    parsed, raw, err = await generate_chapter_draft(
+        ch.source_material,
+        model=None,
+        llm_config=llm_cfg,
+    )
     ch.generator_prompt_version = settings.generator_prompt_version
-    ch.generator_model = settings.chapter_gen_model
+    ch.generator_model = llm_cfg.chapter_model
     ch.updated_at = datetime.now(timezone.utc)
     if err is not None and parsed is None:
         ch.ai_generated_raw = raw

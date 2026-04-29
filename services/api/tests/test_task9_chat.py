@@ -118,3 +118,38 @@ def test_chat_upstream_200(
     )
     assert r.status_code == 200
     assert "Two" in r.json().get("message", "")
+
+
+@respx.mock
+def test_chat_uses_saved_llm_config(client, respx_mock: respx.MockRouter) -> None:
+    ch_id = _published_chapter_id(client)
+    tok = _student_token(client)
+    h = {"Authorization": f"Bearer {tok}"}
+    client.post(
+        "/v1/admin/llm-config",
+        json={
+            "provider": "deepseek",
+            "baseUrl": "https://api.deepseek.com",
+            "apiKey": "k-db",
+            "chapterModel": "m-chapter",
+            "chatModel": "m-chat",
+            "enabled": True,
+        },
+    )
+    respx_mock.post("https://api.deepseek.com/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}}]},
+        )
+    )
+    r = client.post(
+        "/v1/student/chat",
+        json={
+            "chapterId": ch_id,
+            "cellId": "c1",
+            "messages": [{"role": "user", "content": "hi"}],
+        },
+        headers=h,
+    )
+    assert r.status_code == 200
+    assert r.json()["message"] == "ok"

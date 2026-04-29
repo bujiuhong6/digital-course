@@ -1,0 +1,45 @@
+{% extends "teacher/base.html" %}
+{% block title %}课后练习提交与分数{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">课后练习提交与分数</h1>
+    <p class="page-subtitle">{{ exercise.title }}</p>
+  </div>
+  <div class="page-heading-actions">
+    <a class="btn secondary" href="/teacher/post-exercises/submissions.csv">导出全部 CSV</a>
+    <a class="btn secondary" href="/teacher/post-exercises">返回列表</a>
+  </div>
+</div>
+
+<div class="card">
+  {% if not rows %}
+    <p class="muted">暂无学生提交。</p>
+  {% else %}
+  <div class="table-submissions-wrap">
+    <table class="table-submissions">
+      <thead>
+        <tr>
+          <th class="col-nowrap">学号</th>
+          <th class="col-nowrap">姓名</th>
+          <th class="col-nowrap">分数</th>
+          <th class="col-nowrap">提交时间</th>
+          <th class="col-feedback-h">AI反馈</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for sub, st in rows %}
+        <tr>
+          <td class="col-nowrap">{{ st.student_no }}</td>
+          <td class="col-nowrap">{{ st.full_name }}</td>
+          <td class="col-nowrap">{{ sub.score }}</td>
+          <td class="col-nowrap">{{ sub.submitted_at }}</td>
+          <td class="col-feedback">{{ sub.ai_feedback or "" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

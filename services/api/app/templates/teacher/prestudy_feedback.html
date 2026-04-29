@@ -1,0 +1,387 @@
+{% extends "teacher/base.html" %}
+{% block title %}学生预习情况反馈{% endblock %}
+{% block head %}
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+<style>
+  .rating-overview {
+    display: grid;
+    grid-template-columns: minmax(14rem, 0.85fr) minmax(18rem, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+  }
+  .rating-pie-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+  }
+  .rating-pie {
+    width: min(16rem, 72vw);
+    aspect-ratio: 1 / 1;
+    border-radius: 999px;
+    background: conic-gradient({{ rating_summary.pie_gradient }});
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08), 0 14px 30px rgba(15, 23, 42, 0.1);
+    position: relative;
+  }
+  .rating-pie::after {
+    content: "";
+    position: absolute;
+    inset: 26%;
+    border-radius: inherit;
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.06);
+  }
+  .rating-pie-center {
+    position: absolute;
+    inset: 30%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    text-align: center;
+  }
+  .rating-pie-center strong {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+  .rating-pie-center span {
+    margin-top: 0.35rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .rating-summary-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .rating-metric {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-muted);
+    padding: 0.8rem 0.9rem;
+  }
+  .rating-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  .rating-metric strong {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 1.35rem;
+    color: var(--text);
+  }
+  .rating-legend {
+    margin-top: 1rem;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+  .rating-legend-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    padding: 0.7rem;
+    min-width: 0;
+  }
+  .rating-legend-head {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 700;
+  }
+  .rating-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+  .rating-legend-count {
+    margin-top: 0.35rem;
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  .rating-bar {
+    margin-top: 0.55rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--bg-muted);
+    overflow: hidden;
+  }
+  .rating-bar-fill {
+    height: 100%;
+    border-radius: inherit;
+  }
+  .item-average-chart {
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border);
+  }
+  .item-average-chart h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+  }
+  .item-average-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .item-average-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1.1fr) minmax(12rem, 1.6fr) 4.5rem;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .item-average-title {
+    min-width: 0;
+    color: var(--text);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .item-average-track {
+    height: 0.85rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #dcfce7 0%, #fef3c7 55%, #fee2e2 100%);
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+  }
+  .item-average-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #16a34a 0%, #eab308 55%, #dc2626 100%);
+  }
+  .item-average-value {
+    text-align: right;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .teaching-advice-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .teaching-advice-result {
+    margin-top: 1rem;
+  }
+  .teaching-advice-box {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-muted);
+    padding: 0.9rem 1rem;
+    line-height: 1.7;
+  }
+  .teaching-advice-prose {
+    margin-top: 0.75rem;
+    overflow: visible;
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+  .teaching-advice-prose > :first-child {
+    margin-top: 0;
+  }
+  .teaching-advice-prose h2,
+  .teaching-advice-prose h3,
+  .teaching-advice-prose h4 {
+    margin: 1rem 0 0.4rem;
+    font-size: 1.02rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--text);
+  }
+  .teaching-advice-prose p {
+    margin: 0.55rem 0 0;
+  }
+  .teaching-advice-prose ul,
+  .teaching-advice-prose ol {
+    margin: 0.5rem 0 0;
+    padding-left: 1.35rem;
+  }
+  .teaching-advice-prose li {
+    margin: 0.25rem 0;
+  }
+  .teaching-advice-prose code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.88em;
+    padding: 0.12em 0.35em;
+    border-radius: 4px;
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+  }
+  .teaching-advice-prose pre {
+    margin: 0.65rem 0 0;
+    padding: 0.75rem 0.85rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+  .teaching-advice-prose pre code {
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: inherit;
+  }
+  .teaching-advice-prose blockquote {
+    margin: 0.65rem 0 0;
+    padding: 0.5rem 0.85rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(15, 23, 42, 0.03);
+    color: var(--muted);
+  }
+  .teaching-advice-prose table {
+    margin: 0.65rem 0 0;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .teaching-advice-prose th,
+  .teaching-advice-prose td {
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .teaching-advice-prose th {
+    background: var(--bg-elevated);
+    font-weight: 600;
+  }
+  @media (max-width: 58rem) {
+    .rating-overview,
+    .rating-summary-metrics,
+    .rating-legend,
+    .item-average-row {
+      grid-template-columns: 1fr;
+    }
+    .item-average-value {
+      text-align: left;
+    }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">学生预习情况反馈</h1>
+    <p class="page-subtitle">{{ prestudy.title }} · 已提交 {{ response_count }} 人</p>
+  </div>
+  <div class="page-heading-actions">
+    <a class="btn secondary" href="/teacher/prestudy">返回预习列表</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <h2>预习难度整体分布</h2>
+    <span class="muted">1 表示很容易达到，7 表示很难达到</span>
+  </div>
+  <div class="rating-overview">
+    <div class="rating-pie-wrap">
+      <div class="rating-pie" aria-label="1-7 李克特量表整体分布饼图">
+        <div class="rating-pie-center">
+          <strong>{% if rating_summary.average is none %}--{% else %}{{ rating_summary.average }}{% endif %}</strong>
+          <span>平均难度 / 7</span>
+        </div>
+      </div>
+      <strong>{{ rating_summary.difficulty_label }}</strong>
+    </div>
+    <div>
+      <div class="rating-summary-metrics">
+        <div class="rating-metric">
+          <span>总评分数</span>
+          <strong>{{ rating_summary.total }}</strong>
+        </div>
+        <div class="rating-metric">
+          <span>覆盖知识点</span>
+          <strong>{{ rating_summary.knowledge_count }}</strong>
+        </div>
+        <div class="rating-metric">
+          <span>提交人数</span>
+          <strong>{{ response_count }}</strong>
+        </div>
+      </div>
+      <p class="muted" style="margin:0.9rem 0 0;">
+        下方把所有知识点的评分合并统计，便于快速判断学生整体觉得哪些目标更容易或更难。
+      </p>
+    </div>
+  </div>
+  <div class="rating-legend">
+    {% for seg in rating_summary.segments %}
+    <div class="rating-legend-item">
+      <div class="rating-legend-head">
+        <span class="rating-dot" style="background:{{ seg.color }}"></span>
+        <span>{{ seg.score }} 分</span>
+      </div>
+      <div class="rating-legend-count">{{ seg.count }} 次 · {{ seg.percent }}%</div>
+      <div class="rating-bar" aria-hidden="true">
+        <div class="rating-bar-fill" style="width:{{ seg.percent }}%;background:{{ seg.color }}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="item-average-chart">
+    <h3>各知识点平均难度</h3>
+    <div class="item-average-list">
+      {% for item in rating_summary.item_averages %}
+      <div class="item-average-row">
+        <div class="item-average-title" title="{{ item.title }}">{{ item.index }}. {{ item.title }}</div>
+        <div class="item-average-track" aria-label="{{ item.title }} 平均难度">
+          <div class="item-average-fill" style="width:{{ item.bar_width }}%"></div>
+        </div>
+        <div class="item-average-value">
+          {% if item.average is none %}暂无{% else %}{{ item.average }} / 7{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-header"><h2>匿名文字反馈</h2></div>
+  {% if not feedback_rows %}
+    <p class="muted">暂无文字反馈。</p>
+  {% else %}
+    <table>
+      <thead><tr><th>提交时间</th><th>反馈内容</th></tr></thead>
+      <tbody>
+      {% for row in feedback_rows %}
+        <tr>
+          <td>{{ row.response.submitted_at }}</td>
+          <td>{{ row.response.feedback_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <h2>AI教学建议</h2>
+  </div>
+  <div class="teaching-advice-actions">
+    <button
+      type="button"
+      class="btn-publish"
+      hx-post="/teacher/prestudy/{{ prestudy.id }}/feedback/advice"
+      hx-target="#teaching-advice-result"
+      hx-swap="innerHTML"
+      hx-indicator="#teaching-advice-loading"
+    >生成教学建议</button>
+    <span id="teaching-advice-loading" class="muted htmx-indicator">正在生成，请稍候...</span>
+  </div>
+  <div id="teaching-advice-result" class="teaching-advice-result">
+    {% if teaching_advice_html %}
+      {% include "teacher/partials/prestudy_teaching_advice.html" %}
+    {% else %}
+      <p class="muted">点击按钮后，系统会调用教师端已配置的大模型生成建议；生成后可保存，刷新页面仍会显示。</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

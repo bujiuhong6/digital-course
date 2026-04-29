@@ -9,7 +9,18 @@ from sqlalchemy import text
 from .config import settings
 from .db import dispose_engine, get_engine
 from .db import models as _db_models  # noqa: F401 — register ORM metadata
-from .routers import admin, chapter_admin, chat, student, teacher_ui
+from .routers import (
+    admin,
+    chapter_admin,
+    chat,
+    llm_admin,
+    post_exercise_admin,
+    post_exercise_student,
+    prestudy_admin,
+    prestudy_student,
+    student,
+    teacher_ui,
+)
 
 
 @asynccontextmanager
@@ -53,6 +64,11 @@ app.add_middleware(
 )
 app.include_router(admin.router)
 app.include_router(chapter_admin.router)
+app.include_router(llm_admin.router)
+app.include_router(prestudy_admin.router)
+app.include_router(prestudy_student.router)
+app.include_router(post_exercise_admin.router)
+app.include_router(post_exercise_student.router)
 app.include_router(chat.router)
 app.include_router(teacher_ui.router)
 app.include_router(student.router)

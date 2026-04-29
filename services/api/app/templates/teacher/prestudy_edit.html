@@ -1,0 +1,564 @@
+{% extends "teacher/base.html" %}
+{% block title %}{{ prestudy.title }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/jupyter-cells.css" />
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+<style>
+  .draft-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(2.5rem, auto) minmax(20rem, 1fr);
+    column-gap: 1.25rem;
+    row-gap: 0.25rem;
+    align-items: stretch;
+  }
+  .draft-col { display: contents; }
+  .draft-col--template .draft-template-head {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    min-height: 2.5rem;
+  }
+  .draft-col--template .draft-template-head > label { margin: 0; }
+  .draft-col--template #btn-copy-template { margin-left: auto; }
+  .draft-col--template #id-draft-template {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 20rem;
+    height: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
+  }
+  .draft-col--draft > label[for="id-draft"] {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    min-height: 2.5rem;
+    display: flex;
+    align-items: center;
+  }
+  .draft-col--draft #id-draft {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 20rem;
+    height: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
+  }
+  @media (max-width: 56rem) {
+    .draft-dual {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .draft-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .draft-col--template .draft-template-head,
+    .draft-col--template #id-draft-template,
+    .draft-col--draft > label[for="id-draft"],
+    .draft-col--draft #id-draft {
+      grid-column: unset;
+      grid-row: unset;
+      height: auto;
+    }
+  }
+  .publish-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem 0;
+  }
+  .publish-toolbar #fdraft .form-actions {
+    margin-top: 0 !important;
+    justify-content: flex-start !important;
+    gap: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .publish-toolbar .form-actions button[type="submit"],
+  .publish-toolbar form.unpublish-form button[type="submit"] {
+    box-sizing: border-box;
+    width: 7rem;
+    min-width: 7rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+  a.chapter-toolbar-back {
+    box-sizing: border-box;
+    width: 9.25rem;
+    min-width: 9.25rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .publish-toolbar a.chapter-toolbar-back {
+    margin-inline-start: auto;
+  }
+  .chapter-edit-back-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-bottom: 0.35rem;
+  }
+  .publish-toolbar form.unpublish-form { margin: 0; }
+  .publish-toolbar form.unpublish-form button { margin: 0; }
+  .draft-footer-note { color: var(--muted); font-size: 0.85rem; margin: 0.75rem 0 0; }
+  .copy-template-btn { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+  .copy-template-btn.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .copy-template-btn.copy-fail { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .bar-title-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; width: 100%; }
+  .bar-title-row h1 { margin: 0; }
+  .chapter-title-view { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+  .chapter-title-view h1 { flex: 0 1 auto; min-width: 0; }
+  .btn-icon.chapter-title-edit-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.5rem; height: 1.5rem; padding: 0; flex-shrink: 0;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    color: #64748b;
+    cursor: pointer; line-height: 1;
+  }
+  .btn-icon.chapter-title-edit-btn:hover, .btn-icon.chapter-title-edit-btn:focus-visible {
+    background: #e8eef5;
+    color: var(--accent);
+    border-color: #cbd5e1;
+    outline: none;
+  }
+  .bar-title-row .chapter-title-rename-input {
+    width: auto; min-width: 8rem; max-width: min(32rem, 100%);
+    flex: 1 1 12rem;
+  }
+  .bar-title-row.chapter-title-row-editing .chapter-title-view { display: none; }
+  .bar-title-row.chapter-title-row-editing .chapter-title-rename-input { display: block; }
+  .bar-title-row:not(.chapter-title-row-editing) .chapter-title-rename-input { display: none; }
+  .prestudy-preview-list {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .prestudy-preview-item {
+    background: var(--bg-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 0.9rem;
+  }
+  .prestudy-preview-item .kp-id {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+  }
+  .prestudy-preview-item .kp-title {
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+  }
+  .prestudy-preview-item .kp-goal {
+    margin: 0;
+    font-size: 0.92rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  #prestudy-preview-err {
+    margin: 0.75rem 0 0;
+    display: none;
+  }
+  #prestudy-preview-err.visible { display: block; }
+  #prestudy-preview-empty {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div class="page-title-group" style="width:100%;">
+    <div class="bar-title-row" id="prestudy-title-bar">
+      <div class="chapter-title-view" id="prestudy-title-view">
+        <h1 class="page-title" id="prestudy-title-heading">{{ prestudy.title }}</h1>
+        <button type="button" class="btn-icon chapter-title-edit-btn" id="btn-rename-prestudy" aria-label="重命名">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+      </div>
+      <input type="text" id="prestudy-title-input" class="chapter-title-rename-input"
+        data-rename-url="/teacher/prestudy/{{ prestudy.id }}/rename"
+        autocomplete="off" spellcheck="false" />
+    </div>
+  </div>
+</div>
+
+<div id="flash" role="status" aria-live="polite">
+  {% if ui_flash %}
+  <div class="card">
+    <p class="{% if ui_flash_level == 'ok' %}flash-ok{% elif ui_flash_level == 'warn' %}flash-warn{% else %}flash-err{% endif %}" role="status">{% if ui_flash_level == 'ok' %}✓{% elif ui_flash_level == 'warn' %}!{% else %}✗{% endif %} {{ ui_flash }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <h2>预习内容发布</h2>
+  </div>
+  <div class="publish-toolbar">
+    <form
+      id="fdraft"
+      method="post"
+      action="/teacher/prestudy/{{ prestudy.id }}/save-draft"
+    >
+      <div class="form-actions mt-0">
+        <button
+          type="submit"
+          class="secondary"
+          hx-post="/teacher/prestudy/{{ prestudy.id }}/save-draft"
+          hx-include="#id-draft"
+        >保存草稿</button>
+        <button
+          type="submit"
+          class="btn-publish"
+          formaction="/teacher/prestudy/{{ prestudy.id }}/publish"
+          formmethod="post"
+          hx-post="/teacher/prestudy/{{ prestudy.id }}/publish"
+          hx-include="#id-draft"
+          hx-target="#flash"
+          hx-swap="innerHTML"
+        >发布</button>
+      </div>
+    </form>
+    <form
+      class="unpublish-form"
+      method="post"
+      action="/teacher/prestudy/{{ prestudy.id }}/unpublish"
+      hx-post="/teacher/prestudy/{{ prestudy.id }}/unpublish"
+      hx-target="#flash"
+      hx-swap="innerHTML"
+      hx-confirm="确定取消发布？学生端将看不到本预习。"
+    >
+      <button type="submit" class="btn-danger-solid" formnovalidate>
+        取消发布
+      </button>
+    </form>
+    <a class="btn secondary chapter-toolbar-back" href="/teacher/prestudy">返回预习列表</a>
+  </div>
+  <div class="draft-dual">
+    <div class="draft-col draft-col--template">
+      <div class="draft-template-head">
+        <label for="id-draft-template">预习内容JSON模板</label>
+        <button type="button" class="secondary copy-template-btn" id="btn-copy-template" aria-label="复制 JSON 模板到剪贴板">复制</button>
+      </div>
+      <textarea id="id-draft-template" readonly rows="20" spellcheck="false">{{ template_json|e }}</textarea>
+    </div>
+    <div class="draft-col draft-col--draft">
+      <label for="id-draft">生成的JSON模板请粘贴在这里</label>
+      <textarea id="id-draft" name="draft" form="fdraft" rows="20" spellcheck="false">{{ content_json|e }}</textarea>
+    </div>
+  </div>
+  <p class="draft-footer-note">
+    当前状态：<strong>{% if prestudy.status == 'published' %}已发布{% else %}草稿{% endif %}</strong>。
+  </p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">发布预览</h2>
+  <p class="jnb-teacher-banner">学生端预习内容即此结构。</p>
+  <p id="prestudy-preview-empty">在右侧粘贴有效 JSON 后，此处会显示条目预览。</p>
+  <ul id="prestudy-preview-list" class="prestudy-preview-list" hidden></ul>
+  <p id="prestudy-preview-err" class="flash-err" role="status"></p>
+</div>
+
+<div class="chapter-edit-back-wrap">
+  <a class="btn secondary chapter-toolbar-back" href="/teacher/prestudy">返回预习列表</a>
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById("btn-copy-template");
+  var ta = document.getElementById("id-draft-template");
+  if (!btn || !ta) return;
+  var origLabel = btn.getAttribute("aria-label") || "复制 JSON 模板到剪贴板";
+  var origText = btn.textContent;
+  var timer = null;
+  function setFeedback(copied) {
+    if (timer) clearTimeout(timer);
+    btn.classList.remove("copied", "copy-fail");
+    if (copied) {
+      btn.classList.add("copied");
+      btn.textContent = "已复制";
+      btn.setAttribute("aria-label", "已复制到剪贴板");
+    } else {
+      btn.classList.add("copy-fail");
+      btn.textContent = "失败";
+      btn.setAttribute("aria-label", "复制失败，请重试或手动选择文字复制");
+    }
+    timer = setTimeout(function () {
+      btn.textContent = origText;
+      btn.setAttribute("aria-label", origLabel);
+      btn.classList.remove("copied", "copy-fail");
+      timer = null;
+    }, 1500);
+  }
+  btn.addEventListener("click", function () {
+    var text = ta.value;
+    function fail() {
+      setFeedback(false);
+      try { alert("复制失败，请手动选择文字复制。"); } catch (e) {}
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { setFeedback(true); }).catch(fail);
+      } else {
+        fail();
+      }
+    } catch (e) {
+      fail();
+    }
+  });
+})();
+(function () {
+  var bar = document.getElementById("prestudy-title-bar");
+  var h1 = document.getElementById("prestudy-title-heading");
+  var btn = document.getElementById("btn-rename-prestudy");
+  var inp = document.getElementById("prestudy-title-input");
+  if (!bar || !h1 || !btn || !inp) return;
+  var defTitle = {{ prestudy.title|tojson }};
+  var renameUrl = (inp.getAttribute("data-rename-url") || "").trim();
+  var saving = false;
+  function showView() {
+    bar.classList.remove("chapter-title-row-editing");
+    h1.textContent = defTitle;
+  }
+  function exitEditToStaticTitle(merged) {
+    defTitle = merged;
+    h1.textContent = merged;
+    bar.classList.remove("chapter-title-row-editing");
+    saving = false;
+  }
+  function showEdit() {
+    bar.classList.add("chapter-title-row-editing");
+    inp.value = defTitle;
+    setTimeout(function () {
+      inp.focus();
+      try { inp.select(); } catch (e) {}
+    }, 0);
+  }
+  function trySave() {
+    if (saving) return;
+    if (!renameUrl) {
+      try { alert("重命名地址缺失。"); } catch (e) {}
+      return;
+    }
+    var t = (inp.value || "").trim();
+    if (!t) {
+      try { alert("标题不能为空。"); } catch (e) {}
+      return;
+    }
+    if (t.length > 255) {
+      try { alert("标题过长（最多 255 个字符）。"); } catch (e) {}
+      return;
+    }
+    saving = true;
+    var willNavigate = false;
+    var reqHeaders = { "Content-Type": "application/x-www-form-urlencoded" };
+    try { reqHeaders["Referer"] = window.location.href; } catch (e) {}
+    fetch(renameUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: reqHeaders,
+      body: new URLSearchParams({ title: t }),
+      redirect: "manual",
+    })
+      .then(function (res) {
+        if (res.status === 301 || res.status === 302 || res.status === 303 || res.status === 307 || res.status === 308) {
+          var loc = res.headers.get("Location");
+          if (loc) {
+            willNavigate = true;
+            var absolute = new URL(loc, window.location.origin).href;
+            try { window.location.assign(absolute); } catch (e) { try { window.location.href = absolute; } catch (e2) {} }
+            return;
+          }
+          willNavigate = true;
+          try { window.location.reload(); } catch (e) {}
+          return;
+        }
+        if (res.status === 404) {
+          return res.text().then(function (txt) {
+            showView();
+            try { alert((txt && txt.trim()) || "预习不存在。"); } catch (e) {}
+          });
+        }
+        if (res.status >= 400) {
+          return res.text().then(function (txt) {
+            showView();
+            try { alert((txt && txt.trim()) || "重命名失败。"); } catch (e) {}
+          });
+        }
+        showView();
+        try { alert("重命名失败。"); } catch (e) {}
+      })
+      .catch(function (err) {
+        try { console.error("prestudy rename", err); } catch (e) {}
+        showView();
+        try { alert("重命名失败：" + (err && err.message ? err.message : "网络或浏览器错误。")); } catch (e2) {}
+      })
+      .finally(function () {
+        if (!willNavigate) saving = false;
+      });
+  }
+  btn.addEventListener("click", function () { showEdit(); });
+  inp.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") {
+      if (ev.isComposing) return;
+      if (ev.repeat) return;
+      ev.preventDefault();
+      trySave();
+    } else if (ev.key === "Escape") {
+      ev.preventDefault();
+      showView();
+    }
+  });
+  inp.addEventListener("blur", function () {
+    if (!bar.classList.contains("chapter-title-row-editing")) return;
+    if (saving) return;
+    var t = (inp.value || "").trim();
+    if (t === defTitle) {
+      showView();
+      return;
+    }
+    if (!t) {
+      try { alert("标题不能为空。"); } catch (e) {}
+      showView();
+      return;
+    }
+    trySave();
+  });
+  window.addEventListener("submit", function (ev) {
+    if (document.activeElement === inp) ev.preventDefault();
+  }, true);
+})();
+(function () {
+  var pasteTa = document.getElementById("id-draft");
+  var listEl = document.getElementById("prestudy-preview-list");
+  var emptyEl = document.getElementById("prestudy-preview-empty");
+  var errEl = document.getElementById("prestudy-preview-err");
+  if (!pasteTa || !listEl || !emptyEl || !errEl) return;
+
+  function normalizeObj(raw) {
+    if (Array.isArray(raw)) {
+      raw = { version: 1, items: raw };
+    }
+    if (raw && typeof raw === "object" && raw.items && raw.version === undefined) {
+      raw = Object.assign({ version: 1 }, raw);
+    }
+    return raw;
+  }
+
+  function validate(obj) {
+    obj = normalizeObj(obj);
+    if (!obj || typeof obj !== "object") return { ok: false, msg: "JSON 须为对象或条目数组" };
+    if (obj.version !== 1) return { ok: false, msg: "version 须为 1" };
+    var items = obj.items;
+    if (!Array.isArray(items) || !items.length) return { ok: false, msg: "items 须为非空数组" };
+    var seen = {};
+    var clean = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it || typeof it !== "object") return { ok: false, msg: "第 " + (i + 1) + " 条条目须为对象" };
+      var id = String(it.id || "").trim();
+      var title = String(it.title || "").trim();
+      var goal = String(it.learningGoal || it.learning_goal || "").trim();
+      if (!id || !title || !goal) return { ok: false, msg: "每条须含 id、title、learningGoal" };
+      if (seen[id]) return { ok: false, msg: "重复的 id：" + id };
+      seen[id] = true;
+      clean.push({ id: id, title: title, learningGoal: goal });
+    }
+    return { ok: true, items: clean };
+  }
+
+  function render(items) {
+    listEl.innerHTML = "";
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var li = document.createElement("li");
+      li.className = "prestudy-preview-item";
+      li.innerHTML =
+        '<div class="kp-id">ID · ' + escapeHtml(it.id) + '</div>' +
+        '<p class="kp-title">' + escapeHtml(it.title) + '</p>' +
+        '<p class="kp-goal">' + escapeHtml(it.learningGoal) + '</p>';
+      listEl.appendChild(li);
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function refresh() {
+    errEl.textContent = "";
+    errEl.classList.remove("visible");
+    var txt = (pasteTa.value || "").trim();
+    if (!txt) {
+      emptyEl.hidden = false;
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+      return;
+    }
+    var parsed;
+    try {
+      parsed = JSON.parse(pasteTa.value);
+    } catch (e) {
+      emptyEl.hidden = true;
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+      errEl.textContent = "✗ JSON 解析失败：" + (e && e.message ? e.message : "格式有误");
+      errEl.classList.add("visible");
+      return;
+    }
+    var v = validate(parsed);
+    if (!v.ok) {
+      emptyEl.hidden = true;
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+      errEl.textContent = "✗ " + v.msg;
+      errEl.classList.add("visible");
+      return;
+    }
+    errEl.classList.remove("visible");
+    emptyEl.hidden = true;
+    listEl.hidden = false;
+    render(v.items);
+  }
+
+  pasteTa.addEventListener("input", refresh);
+  pasteTa.addEventListener("change", refresh);
+  refresh();
+})();
+</script>
+{% endblock %}

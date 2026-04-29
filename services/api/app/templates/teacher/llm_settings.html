@@ -1,0 +1,83 @@
+{% extends "teacher/base.html" %}
+{% block title %}大模型接入{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">大模型接入</h1>
+    <p class="page-subtitle">配置一次后，教师端内容生成、学生端 AI 助手与后续自动批改会共用这套模型。</p>
+  </div>
+</div>
+
+{% if saved %}
+  <p class="flash-ok" role="status">✓ 配置已保存。</p>
+{% endif %}
+
+<div class="card">
+  <div class="section-header">
+    <h2>模型服务配置</h2>
+    <span class="muted">API Key 会加密保存，页面仅显示脱敏结果。</span>
+  </div>
+  <form method="post" action="/teacher/llm-settings">
+    <label for="provider">模型提供商</label>
+    <select id="provider" name="provider">
+      {% for key, preset in presets.items() %}
+      <option value="{{ key }}" data-base-url="{{ preset.baseUrl }}" {% if config.provider == key %}selected{% endif %}>{{ preset.label }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="base-url">URL</label>
+    <input id="base-url" name="baseUrl" type="text" value="{{ config.baseUrl }}" placeholder="https://api.deepseek.com" required/>
+
+    <label for="api-key">API Key</label>
+    <input id="api-key" name="apiKey" type="password" value="" placeholder="{% if config.apiKeyMasked %}当前：{{ config.apiKeyMasked }}，留空保持不变{% else %}填入服务商 API Key{% endif %}"/>
+    {% if config.apiKeyMasked %}
+    <label style="display:flex;align-items:center;gap:0.45rem;margin-top:0.65rem;">
+      <input type="checkbox" name="clearApiKey" value="1" style="width:auto;"/>
+      清空已保存的 API Key
+    </label>
+    {% endif %}
+
+    <label for="chapter-model">教师端章节生成模型</label>
+    <input id="chapter-model" name="chapterModel" type="text" value="{{ config.chapterModel }}" required/>
+
+    <label for="chat-model">学生端 AI 助手 / 批改模型</label>
+    <input id="chat-model" name="chatModel" type="text" value="{{ config.chatModel }}" required/>
+
+    <label style="display:flex;align-items:center;gap:0.45rem;margin-top:0.85rem;">
+      <input type="checkbox" name="enabled" value="1" style="width:auto;" {% if config.enabled %}checked{% endif %}/>
+      启用数据库中的大模型配置
+    </label>
+
+    <div class="form-actions">
+      <button type="submit">保存配置</button>
+      <button type="button" class="secondary" id="llm-test-btn">测试连接</button>
+    </div>
+    <p class="muted" id="llm-test-result" role="status"></p>
+  </form>
+</div>
+
+<script>
+(function () {
+  var provider = document.getElementById('provider');
+  var baseUrl = document.getElementById('base-url');
+  if (provider && baseUrl) {
+    provider.addEventListener('change', function () {
+      var opt = provider.options[provider.selectedIndex];
+      var url = opt && opt.getAttribute('data-base-url');
+      if (url) baseUrl.value = url;
+    });
+  }
+  var btn = document.getElementById('llm-test-btn');
+  var out = document.getElementById('llm-test-result');
+  if (btn && out) {
+    btn.addEventListener('click', function () {
+      out.textContent = '正在测试连接…';
+      fetch('/v1/admin/llm-config/test', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { out.textContent = j.ok ? '连接成功。' : (j.error || '连接失败。'); })
+        .catch(function (e) { out.textContent = '连接失败：' + e; });
+    });
+  }
+})();
+</script>
+{% endblock %}

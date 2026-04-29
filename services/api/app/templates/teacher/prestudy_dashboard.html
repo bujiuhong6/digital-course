@@ -1,0 +1,53 @@
+{% extends "teacher/base.html" %}
+{% block title %}AI智能预习{% endblock %}
+{% block body %}
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">AI智能预习</h1>
+    <p class="page-subtitle">发布课前核心知识点，让学生提前判断学习目标的难易程度。</p>
+  </div>
+</div>
+
+{% if flash == "published" %}<p class="flash-ok">✓ 预习内容已发布。</p>{% endif %}
+{% if flash == "deleted" %}<p class="flash-ok">✓ 预习内容已删除。</p>{% endif %}
+
+<div class="card">
+  <div class="section-header"><h2>新建预习</h2></div>
+  <form method="post" action="/teacher/prestudy/new">
+    <label for="title">标题</label>
+    <input id="title" name="title" type="text" value="新预习" required/>
+    <div class="form-actions"><button type="submit">创建</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="section-header"><h2>预习列表</h2></div>
+  {% if not prestudies %}
+    <p class="muted">还没有预习内容。创建后可粘贴 JSON 模板发布。</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr><th>标题</th><th>状态</th><th class="actions-head">操作</th></tr>
+    </thead>
+    <tbody>
+    {% for p in prestudies %}
+      <tr>
+        <td><a href="/teacher/prestudy/{{ p.id }}/edit">{{ p.title }}</a></td>
+        <td>{% if p.status == "published" %}已发布{% else %}草稿{% endif %}</td>
+        <td class="actions-cell">
+          <a href="/teacher/prestudy/{{ p.id }}/edit">编辑</a>
+          {% if p.status == "published" %}
+            <span class="muted">&nbsp;·&nbsp;</span>
+            <a href="/teacher/prestudy/{{ p.id }}/feedback">学生预习情况反馈</a>
+          {% endif %}
+          <form method="post" action="/teacher/prestudy/{{ p.id }}/delete" style="display:inline;margin-inline-start:0.35rem;" onsubmit="return confirm('确定删除这份预习？相关反馈也会删除。');">
+            <button type="submit" class="link-danger">删除</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}
