@@ -10,7 +10,6 @@
 - `apps/student-desktop/`：学生端 Tauri + React + Vite 应用。
 - `services/api/seeds/chapters.json`：已发布章节练习 seed。保留课程题目，不包含学生、名单、班级、管理员和答题记录。
 - `scripts/initialize_content_db.py`：用 seed 初始化数据库，并清空运行时数据。
-- `docs/superpowers/`：产品规格、实现计划和开发过程文档。
 
 ## 初始化 API
 
@@ -127,4 +126,3 @@ pnpm build
 - 不提交 `services/api/.env`、`apps/student-desktop/.env`、SQLite 数据库、虚拟环境、缓存和本地截图。
 - 推送前可用 `git status --short` 和敏感词扫描确认没有 API Key。
 - `services/api/seeds/chapters.json` 是课程内容来源。运行 `scripts/initialize_content_db.py` 会保留这些章节并清空运行时数据。
-- Context7 MCP 本地使用时可复制根目录 `.env.example` 为 `.env`，填写 `CONTEXT7_API_KEY`。MCP 配置在 `.cursor/mcp.json`。
