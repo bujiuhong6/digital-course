@@ -32,3 +32,11 @@ def decrypt_password(ciphertext_b64: str) -> str:
     nonce, data = raw[:12], raw[12:]
     aesgcm = AESGCM(_raw_key())
     return aesgcm.decrypt(nonce, data, None).decode("utf-8")
+
+
+def encrypt_secret(plain: str) -> str:
+    return encrypt_password(plain)
+
+
+def decrypt_secret(ciphertext_b64: str) -> str:
+    return decrypt_password(ciphertext_b64)

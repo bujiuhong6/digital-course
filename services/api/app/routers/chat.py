@@ -30,6 +30,7 @@ from ..config import (
 from ..db.models import Chapter, Student
 from ..deps import CurrentStudent, DBSession
 from ..services.chat_limiter import check_and_record_request
+from ..services.llm_config import get_effective_llm_config
 
 router = APIRouter(prefix="/v1/student", tags=["student", "chat"])
 
@@ -122,9 +123,8 @@ async def _student_chat_impl(
             detail=reason,
         )
 
-    base = normalize_openai_compat_base_url(
-        settings.chat_llm_base_url or settings.llm_base_url
-    )
+    cfg = await get_effective_llm_config(db)
+    base = normalize_openai_compat_base_url(cfg.base_url)
     if not base:
         # 未配置上游：不调用外网；正文对学生尽量短，运维见 services/api/.env.example。
         mock_body = {
@@ -136,7 +136,7 @@ async def _student_chat_impl(
         return JSONResponse(content=mock_body)
 
     url = openai_compat_chat_completions_url(base)
-    api_key = settings.chat_llm_api_key or settings.llm_api_key
+    api_key = cfg.api_key
     messages = [
         {
             "role": "system",
@@ -146,7 +146,7 @@ async def _student_chat_impl(
         {"role": "user", "content": _truncate(user_prompt, settings.chat_context_max_chars)},
     ]
     jbody: dict = {
-        "model": settings.chat_model,
+        "model": cfg.chat_model,
         "messages": messages,
     }
     if payload.stream:

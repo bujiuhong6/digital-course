@@ -27,6 +27,7 @@ from ..config import (
     settings,
 )
 from .chapter_json import sample_published_v1
+from .llm_config import EffectiveLLMConfig
 
 _PROMPT_PATH = (
     Path(__file__).resolve().parent.parent.parent / "config" / "prompts" / "chapter-generate.v1.md"
@@ -56,6 +57,7 @@ async def generate_chapter_draft(
     source_material: str | None,
     *,
     model: str | None = None,
+    llm_config: EffectiveLLMConfig | None = None,
 ) -> tuple[dict[str, Any] | None, str | None, str | None]:
     """
     返回 `(parsed_object_or_none, raw_model_text, error_string_or_none)`。
@@ -67,7 +69,9 @@ async def generate_chapter_draft(
         s = json.dumps(d, ensure_ascii=False)
         return d, s, None
 
-    base = normalize_openai_compat_base_url(settings.llm_base_url)
+    base = normalize_openai_compat_base_url(
+        llm_config.base_url if llm_config is not None else settings.llm_base_url
+    )
     if not base:
         return (
             None,
@@ -75,7 +79,7 @@ async def generate_chapter_draft(
             "LLM_BASE_URL is required when chapter generation is not in mock mode (set CHAPTER_GEN_MOCK=1 to use fixed JSON).",
         )
 
-    m = model or settings.chapter_gen_model
+    m = model or (llm_config.chapter_model if llm_config is not None else settings.chapter_gen_model)
     url = openai_compat_chat_completions_url(base)
     sys_rules = _prompt_instruction()
     user_block = f"{sys_rules}\n\n--- source_material ---\n{source_material or ''}"
@@ -87,8 +91,9 @@ async def generate_chapter_draft(
         ],
     }
     headers: dict[str, str] = {"Content-Type": "application/json"}
-    if settings.llm_api_key:
-        headers["Authorization"] = f"Bearer {settings.llm_api_key}"
+    api_key = llm_config.api_key if llm_config is not None else settings.llm_api_key
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     headers = merge_openai_compat_llm_headers(base, headers)
 
     delay = 1.0

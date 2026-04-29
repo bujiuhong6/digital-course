@@ -216,3 +216,152 @@ class ChapterCompletion(Base):
     )
 
     __table_args__ = (UniqueConstraint("student_id", "chapter_id", name="uq_chapter_completion"),)
+
+
+class PrestudyChapter(Base):
+    __tablename__ = "prestudy_chapters"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    order: Mapped[int] = mapped_column(
+        "order",
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="draft",
+        server_default=text("'draft'"),
+    )
+    published_content: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    teaching_advice_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PrestudyResponse(Base):
+    __tablename__ = "prestudy_responses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    prestudy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("prestudy_chapters.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ratings: Mapped[list] = mapped_column(JSON, nullable=False)
+    feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "prestudy_id", name="uq_prestudy_response_student"),
+    )
+
+
+class PostExercise(Base):
+    __tablename__ = "post_exercises"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    order: Mapped[int] = mapped_column(
+        "order",
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="draft",
+        server_default=text("'draft'"),
+    )
+    published_content: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PostExerciseSubmission(Base):
+    __tablename__ = "post_exercise_submissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    exercise_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("post_exercises.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    answers: Mapped[list] = mapped_column(JSON, nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    ai_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    graded_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "exercise_id", name="uq_post_exercise_submission_student"),
+    )
+
+
+class LLMConfig(Base):
+    __tablename__ = "llm_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    provider: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="deepseek",
+        server_default=text("'deepseek'"),
+    )
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    api_key_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chapter_model: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="gpt-4o-mini",
+        server_default=text("'gpt-4o-mini'"),
+    )
+    chat_model: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="gpt-4o-mini",
+        server_default=text("'gpt-4o-mini'"),
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("0"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
