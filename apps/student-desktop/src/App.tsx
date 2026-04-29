@@ -12,12 +12,24 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, ClipboardList, Lightbulb } from "lucide-react";
 import { apiJson, clearToken, getToken, setToken } from "./api";
 import { ChapterPractice } from "./ChapterPractice";
 import { hasMeaningfulCodeDraft } from "./chapterDraftStorage";
+import { PostExerciseDetail } from "./PostExerciseDetail";
+import { PostExerciseList } from "./PostExerciseList";
+import { PrestudyDetail } from "./PrestudyDetail";
+import { PrestudyList } from "./PrestudyList";
 import "./App.css";
 
-type Screen = "auth" | "chapters" | "chapter";
+type Screen =
+  | "auth"
+  | "chapters"
+  | "chapter"
+  | "prestudies"
+  | "prestudy"
+  | "postExercises"
+  | "postExercise";
 
 type PracticeStatus = "pending" | "inProgress" | "submitted";
 
@@ -102,6 +114,8 @@ function App() {
   const [password2, setPassword2] = useState("");
   const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [selected, setSelected] = useState<ChapterBody | null>(null);
+  const [selectedPrestudyId, setSelectedPrestudyId] = useState<string | null>(null);
+  const [selectedPostExerciseId, setSelectedPostExerciseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
 
@@ -200,6 +214,8 @@ function App() {
     setCurrentStudentId(null);
     setChapters([]);
     setSelected(null);
+    setSelectedPrestudyId(null);
+    setSelectedPostExerciseId(null);
     setScreen("auth");
     setAuthTab("login");
   }
@@ -232,10 +248,30 @@ function App() {
     void goChapters();
   }
 
+  function openPrestudy(id: string) {
+    setSelectedPrestudyId(id);
+    setScreen("prestudy");
+  }
+
+  function backToPrestudies() {
+    setSelectedPrestudyId(null);
+    setScreen("prestudies");
+  }
+
+  function openPostExercise(id: string) {
+    setSelectedPostExerciseId(id);
+    setScreen("postExercise");
+  }
+
+  function backToPostExercises() {
+    setSelectedPostExerciseId(null);
+    setScreen("postExercises");
+  }
+
   const rootClassName = [
     "sd-root",
     screen === "auth" ? "sd-auth-screen" : "",
-    screen === "chapter" ? "sd-wide" : "",
+    screen === "chapter" || screen === "prestudy" || screen === "postExercise" ? "sd-wide" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -243,15 +279,81 @@ function App() {
   return (
     <main className={rootClassName}>
       <header className="sd-header">
-        <div className="sd-header-copy">
-          <p className="sd-eyebrow">《数字技术与应用》课程</p>
-          <h1>AI智能编程学习平台</h1>
-          <p>跟着AI助教，一步一步学会python编程</p>
+        <div className="sd-header-top">
+          <div className="sd-header-copy">
+            <p className="sd-eyebrow">《数字技术与应用》课程</p>
+            <h1>AI智能编程学习平台</h1>
+          </div>
+          {screen !== "auth" && getToken() && (
+            <div className="sd-header-actions">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="sd-header-logout"
+                onClick={onLogout}
+              >
+                退出登录
+              </Button>
+            </div>
+          )}
         </div>
         {screen !== "auth" && getToken() && (
-          <Button type="button" variant="outline" onClick={onLogout}>
-            退出
-          </Button>
+          <nav className="sd-module-nav" aria-label="学习模块">
+            <div className="sd-module-nav-rail">
+              <button
+                type="button"
+                className={
+                  screen === "chapters" || screen === "chapter"
+                    ? "sd-module-nav-item is-active"
+                    : "sd-module-nav-item"
+                }
+                onClick={() => void goChapters()}
+              >
+                <BookOpen className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
+                <span className="sd-module-nav-text">
+                  <span className="sd-module-nav-label">AI课堂助教</span>
+                  <span className="sd-module-nav-desc">随堂编程练习</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={
+                  screen === "prestudies" || screen === "prestudy"
+                    ? "sd-module-nav-item is-active"
+                    : "sd-module-nav-item"
+                }
+                onClick={() => {
+                  setSelectedPrestudyId(null);
+                  setScreen("prestudies");
+                }}
+              >
+                <Lightbulb className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
+                <span className="sd-module-nav-text">
+                  <span className="sd-module-nav-label">AI智能预习</span>
+                  <span className="sd-module-nav-desc">课前目标反馈</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={
+                  screen === "postExercises" || screen === "postExercise"
+                    ? "sd-module-nav-item is-active"
+                    : "sd-module-nav-item"
+                }
+                onClick={() => {
+                  setSelectedPostExerciseId(null);
+                  setScreen("postExercises");
+                }}
+              >
+                <ClipboardList className="sd-module-nav-icon" strokeWidth={2.1} aria-hidden />
+                <span className="sd-module-nav-text">
+                  <span className="sd-module-nav-label">AI课后练习</span>
+                  <span className="sd-module-nav-desc">测验与 AI 批改</span>
+                </span>
+              </button>
+            </div>
+          </nav>
         )}
       </header>
 
@@ -318,7 +420,9 @@ function App() {
                   <form className="sd-form" onSubmit={onRegister}>
                     <div className="sd-form-copy">
                       <h2>首次使用</h2>
-                      <p>使用金陵科技学院教务系统里的学号和姓名来注册，密码自行设定，并妥善保管</p>
+                      <p>
+                        请使用金陵科技学院学籍学号与真实姓名完成注册，信息须与教师导入名单一致；登录密码由你自行设置并妥善保管。
+                      </p>
                     </div>
                     <label>
                       学号
@@ -370,13 +474,13 @@ function App() {
       {screen === "chapters" && (
         <Card className="sd-card sd-chapters-card">
           <CardHeader>
-            <CardTitle>已发布章节练习</CardTitle>
-            <CardDescription>选择一章开始练习，系统会显示你的进度。</CardDescription>
+            <CardTitle>AI课堂助教</CardTitle>
+            <CardDescription>选择一章进入课堂练习，系统会显示你的学习进度。</CardDescription>
           </CardHeader>
           <CardContent>
           {chapters.length === 0 ? (
             <div className="sd-empty">
-              <p>还没有开放的章节。</p>
+              <p>还没有开放的课堂助教章节。</p>
               <span>等老师发布后，这里会出现章节列表。</span>
             </div>
           ) : (
@@ -427,7 +531,7 @@ function App() {
         <section className="sd-chapter-wrap">
           <div className="sd-chapter-topbar">
             <Button type="button" variant="outline" onClick={backToChapters}>
-              返回列表
+              返回课堂助教
             </Button>
             <span>练习会自动保留本地草稿。</span>
           </div>
@@ -450,6 +554,22 @@ function App() {
             </>
           )}
         </section>
+      )}
+
+      {screen === "prestudies" && <PrestudyList onOpen={openPrestudy} />}
+
+      {screen === "prestudy" && selectedPrestudyId && (
+        <PrestudyDetail prestudyId={selectedPrestudyId} onBack={backToPrestudies} />
+      )}
+
+      {screen === "postExercises" && <PostExerciseList onOpen={openPostExercise} />}
+
+      {screen === "postExercise" && selectedPostExerciseId && (
+        <PostExerciseDetail
+          exerciseId={selectedPostExerciseId}
+          studentId={currentStudentId}
+          onBack={backToPostExercises}
+        />
       )}
     </main>
   );

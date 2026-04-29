@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from ..db.models import CellVerification, Chapter, ChapterCompletion, RosterEntry, Student
+from ..db.models import AdminConfig, CellVerification, Chapter, ChapterCompletion, RosterEntry, Student
 from ..deps import CurrentStudent, DBSession
 from ..services.cell_eval import (
     is_cell_passing,
@@ -26,9 +26,21 @@ from ..services.cell_eval import (
 from ..services.crypto import decrypt_password, encrypt_password
 from ..services.student_jwt import create_student_token
 
+try:
+    from passlib.context import CryptContext
+except ImportError:  # pragma: no cover
+    CryptContext = None  # type: ignore[misc, assignment]
+
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto") if CryptContext else None
+
 router = APIRouter(prefix="/v1/student", tags=["student"])
 
 _STOUT_MAX = 200_000
+
+
+def _normalize_admin_username(username: str | None) -> str:
+    """与 `admin` 路由一致，便于学号字段与管理员账号对齐。"""
+    return (username or "admin").strip() or "admin"
 
 
 class RegisterBody(BaseModel):
@@ -88,36 +100,81 @@ async def student_login(body: LoginBody, db: DBSession) -> dict:
     """
     校验学号与口令后签发 **JWT**（**非**教师 Cookie）。
 
+    若尚无 `students` 行，但学号与 **管理员账号**一致且口令通过 `admin_config` 的 bcrypt
+    校验，则自动建立对应学生行并登录（与教师端首次注册的账号共用）。
+
     响应含 `accessToken`、**秒**为单位的 `expiresIn`；用于后续 `Authorization: Bearer`。
     """
-    r = await db.execute(select(Student).where(Student.student_no == body.student_no))
+    sn = body.student_no.strip()
+    r = await db.execute(select(Student).where(Student.student_no == sn))
     st = r.scalar_one_or_none()
-    if st is None:
+
+    def _response_for(student: Student) -> dict:
+        token, exp_sec = create_student_token(student.id)
+        return {
+            "ok": True,
+            "accessToken": token,
+            "expiresIn": exp_sec,
+            "student": {
+                "studentId": str(student.id),
+                "studentNo": student.student_no,
+                "fullName": student.full_name,
+                "mustChangePassword": student.must_change_password,
+            },
+        }
+
+    if st is not None:
+        ok_plain = False
+        try:
+            plain = decrypt_password(st.password_ciphertext)
+        except Exception:
+            plain = None
+        if plain is not None and hmac.compare_digest(
+            plain.encode("utf-8"), body.password.encode("utf-8"),
+        ):
+            ok_plain = True
+        if ok_plain:
+            return _response_for(st)
+        admin_row = (
+            await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+        ).scalar_one_or_none()
+        if (
+            admin_row is not None
+            and _pwd_ctx is not None
+            and st.student_no == admin_row.username
+            and _pwd_ctx.verify(body.password, admin_row.password_hash)
+        ):
+            st.password_ciphertext = encrypt_password(body.password)
+            await db.flush()
+            return _response_for(st)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials",
         )
-    try:
-        plain = decrypt_password(st.password_ciphertext)
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials",
+
+    admin_row = (
+        await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+    ).scalar_one_or_none()
+    if (
+        admin_row is not None
+        and _pwd_ctx is not None
+        and admin_row.username == _normalize_admin_username(sn)
+        and _pwd_ctx.verify(body.password, admin_row.password_hash)
+    ):
+        st_new = Student(
+            id=uuid.uuid4(),
+            student_no=admin_row.username,
+            full_name=admin_row.username,
+            password_ciphertext=encrypt_password(body.password),
+            must_change_password=False,
+            class_id=None,
         )
-    if not hmac.compare_digest(plain.encode("utf-8"), body.password.encode("utf-8")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials",
-        )
-    token, exp_sec = create_student_token(st.id)
-    return {
-        "ok": True,
-        "accessToken": token,
-        "expiresIn": exp_sec,
-        "student": {
-            "studentId": str(st.id),
-            "studentNo": st.student_no,
-            "fullName": st.full_name,
-            "mustChangePassword": st.must_change_password,
-        },
-    }
+        db.add(st_new)
+        await db.flush()
+        return _response_for(st_new)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials",
+    )
 
 
 @router.get("/me")

@@ -8,9 +8,10 @@ type Props = {
   chapterId: string;
   /** 当前选中的练习 cell 与代码（与 POST /v1/student/chat 一致） */
   getContext: () => { cellId: string; currentCode: string };
+  contextKind?: "chapter" | "postExercise";
 };
 
-export function StudentChat({ chapterId, getContext }: Props) {
+export function StudentChat({ chapterId, getContext, contextKind = "chapter" }: Props) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -38,18 +39,30 @@ export function StudentChat({ chapterId, getContext }: Props) {
     setLoading(true);
     try {
       const next = nextMsgs;
+      const path =
+        contextKind === "postExercise"
+          ? `/v1/student/post-exercises/${chapterId}/chat`
+          : "/v1/student/chat";
+      const body =
+        contextKind === "postExercise"
+          ? {
+              questionId: cellId,
+              currentAnswer: currentCode || null,
+              messages: next.map((x) => ({ role: x.role, content: x.content })),
+            }
+          : {
+              chapterId,
+              cellId,
+              currentCode: currentCode || null,
+              messages: next.map((x) => ({ role: x.role, content: x.content })),
+            };
       const res = await apiJson<{
         message?: string;
         mock?: boolean;
         ok?: boolean;
-      }>("/v1/student/chat", {
+      }>(path, {
         method: "POST",
-        body: JSON.stringify({
-          chapterId,
-          cellId,
-          currentCode: currentCode || null,
-          messages: next.map((x) => ({ role: x.role, content: x.content })),
-        }),
+        body: JSON.stringify(body),
       });
       const text = res.message ?? "（无回复内容）";
       setMessages((prev) => [
@@ -61,7 +74,7 @@ export function StudentChat({ chapterId, getContext }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [chapterId, getContext, input, loading, messages]);
+  }, [chapterId, contextKind, getContext, input, loading, messages]);
 
   return (
     <>

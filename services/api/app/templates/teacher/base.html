@@ -332,6 +332,33 @@
     tbody tr:hover td { background: rgba(248, 250, 252, 0.85); }
     tbody tr:nth-child(even) td { background-color: rgba(248, 250, 252, 0.4); }
 
+    /* 提交等一览表：学号/姓名/分数/时间单行显示；极窄或缩放时横向滚动。 */
+    .table-submissions-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-inline: -0.2rem;
+      padding-inline: 0.2rem;
+    }
+    table.table-submissions {
+      width: max-content;
+      min-width: 100%;
+      table-layout: auto;
+    }
+    table.table-submissions .col-nowrap,
+    table.table-submissions th.col-nowrap {
+      white-space: nowrap;
+    }
+    table.table-submissions th.col-feedback-h {
+      white-space: nowrap;
+      text-align: center;
+    }
+    table.table-submissions td.col-feedback {
+      white-space: normal;
+      min-width: 14rem;
+      max-width: min(40rem, 85vw);
+      word-break: break-word;
+    }
+
     .actions-head { width: min(14rem, 28%); white-space: nowrap; text-align: right; }
 
     /* Dashboard chapter list: header aligns with 「完成记录」 (row links stay right-aligned). */
