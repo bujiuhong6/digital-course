@@ -10,10 +10,33 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
 # 编辑 .env（JWT、数据库等）
+python -m alembic upgrade head
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 `GET /health` 应返回 `{"ok":true}`。
+
+## 初始化课程内容
+
+仓库不提交本地 SQLite 数据库。章节练习题目保存在 `services/api/seeds/chapters.json`，其中不包含管理员账号、学生名单、班级、学生账号、答题记录和审计记录。
+
+从仓库根目录执行：
+
+```bash
+services/api/.venv/bin/python scripts/initialize_content_db.py --prune-extra-chapters
+```
+
+效果：
+
+- 导入 seed 中的已发布章节练习。
+- 清空 `admin_config`、`students`、`classes`、`roster_entries`、`cell_verifications`、`chapter_completions`、`admin_audit`。
+- 教师端下次访问 `/teacher/login` 时会进入首次管理员账号设置流程。
+
+如只想导入章节并保留运行时数据：
+
+```bash
+services/api/.venv/bin/python scripts/initialize_content_db.py --keep-runtime
+```
 
 ## 学生端 CORS（Chat / `Failed to fetch`）
 
@@ -49,7 +72,28 @@ CHAT_MODEL=openai/gpt-4o-mini
 
 硅基流动等多数 OpenAI 兼容厂商，将 `LLM_BASE_URL` 设为**不含**路径 `/v1` 的根（代码会拼 `/v1/chat/completions`）。DeepSeek 使用官方基址 `https://api.deepseek.com`，本服务会请求 `https://api.deepseek.com/chat/completions`。模型名以厂商控制台为准，例如 `deepseek-v4-flash`。
 
+DeepSeek 学生 AI 助手示例：
+
+```env
+CHAPTER_GEN_MOCK=0
+CHAT_LLM_BASE_URL=https://api.deepseek.com
+CHAT_LLM_API_KEY=<your-deepseek-api-key>
+CHAT_MODEL=deepseek-v4-flash
+```
+
+硅基流动示例：
+
+```env
+CHAPTER_GEN_MOCK=0
+LLM_BASE_URL=https://api.siliconflow.cn
+LLM_API_KEY=<your-siliconflow-api-key>
+CHAPTER_GEN_MODEL=deepseek-ai/DeepSeek-V4-Flash
+CHAT_MODEL=deepseek-ai/DeepSeek-V4-Flash
+```
+
 **Mock 开发**：保留 `CHAPTER_GEN_MOCK=1` 时，章生成仍返回固定示范 JSON；学生聊天在未配置任何 LLM 基址时会返回带 `mock: true` 的 JSON 响应。
+
+**密钥安全**：只在 `services/api/.env` 填写真实 API Key。`.env` 已被 `.gitignore` 忽略，提交前仍应运行 `git status --short` 确认没有把密钥文件加入暂存区。
 
 ## 测试
 

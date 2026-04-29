@@ -99,6 +99,12 @@ class Settings(BaseSettings):
         description="为 True 时匹配 localhost/127.0.0.1/tauri.localhost 的跨域来源。",
         validation_alias=AliasChoices("CORS_DEV_LOCALHOST_REGEX",),
     )
+    # 默认还会合并内置演示学号 bujiuhong6（仅从教师名单相关视图隐藏，不删库）。
+    # 逗号分隔学号（可含中英文逗号）：在上述基础上额外指定需隐藏的学号。
+    teacher_roster_hidden_student_nos: str = Field(
+        default="",
+        validation_alias=AliasChoices("TEACHER_ROSTER_HIDDEN_STUDENT_NOS"),
+    )
 
     @field_validator("llm_base_url", "chat_llm_base_url", mode="before")
     @classmethod

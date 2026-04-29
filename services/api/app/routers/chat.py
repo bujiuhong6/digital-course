@@ -126,11 +126,11 @@ async def _student_chat_impl(
         settings.chat_llm_base_url or settings.llm_base_url
     )
     if not base:
-        # 开发/测试：不调用外网
+        # 未配置上游：不调用外网；正文对学生尽量短，运维见 services/api/.env.example。
         mock_body = {
             "ok": True,
             "mock": True,
-            "message": "Chat LLM not configured; set CHAT_LLM_BASE_URL (or use LLM_BASE_URL).",
+            "message": "尚未连接 AI 模型。",
             "at": datetime.now(timezone.utc).isoformat(),
         }
         return JSONResponse(content=mock_body)

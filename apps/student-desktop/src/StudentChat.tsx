@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiJson } from "./api";
 import "./StudentChat.css";
 
-type Msg = { role: "user" | "assistant"; content: string };
+type Msg = { role: "user" | "assistant"; content: string; mock?: boolean };
 
 type Props = {
   chapterId: string;
@@ -52,7 +52,10 @@ export function StudentChat({ chapterId, getContext }: Props) {
         }),
       });
       const text = res.message ?? "（无回复内容）";
-      setMessages((m) => [...m, { role: "assistant", content: text }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: text, mock: Boolean(res.mock) },
+      ]);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -64,33 +67,38 @@ export function StudentChat({ chapterId, getContext }: Props) {
     <>
       <button
         type="button"
-        className="sd-chat-fab"
+        className={`sd-chat-fab${open ? " is-open" : ""}`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        title="AI学习助手"
+        title="问问 AI"
       >
-        <span className="sd-chat-fab-icon" aria-hidden>
-          ✦
+        <img
+          className="sd-chat-fab-icon"
+          src="/ai-tutor-avatar.svg"
+          width={36}
+          height={36}
+          alt=""
+          aria-hidden
+        />
+        <span className="sd-chat-fab-copy">
+          <strong>问问 AI</strong>
+          <small>卡住了可以问我</small>
         </span>
-        <span>AI学习助手</span>
       </button>
-      {open && (
-        <div className="sd-chat-backdrop" aria-hidden onClick={() => setOpen(false)} />
-      )}
       <aside
         className={`sd-chat-panel${open ? " is-open" : ""}`}
-        aria-label="AI学习助手"
+        aria-label="问问 AI"
       >
         <header className="sd-chat-hd">
           <img
             className="sd-chat-hd-icon"
-            src="/chat-assistant.svg"
+            src="/ai-tutor-avatar.svg"
             width={24}
             height={24}
             alt=""
             aria-hidden
           />
-          <h2>AI学习助手</h2>
+          <h2>问问 AI</h2>
           <button
             type="button"
             className="sd-chat-close"
@@ -104,13 +112,15 @@ export function StudentChat({ chapterId, getContext }: Props) {
         <div className="sd-chat-msgs" ref={listRef}>
           {messages.length === 0 && (
             <p className="sd-chat-hint">
-              可在此向 AI 学习助手询问本题代码、运行报错与修改建议。
+              卡住了可以问我。先自己想一想，再把问题写清楚。
             </p>
           )}
           {messages.map((m, i) => (
             <div
               key={`${i}-${m.role}`}
-              className={`sd-chat-bubble ${m.role === "user" ? "is-user" : "is-bot"}`}
+              className={`sd-chat-bubble ${m.role === "user" ? "is-user" : "is-bot"}${
+                m.role === "assistant" && m.mock ? " is-mock-assistant" : ""
+              }`}
             >
               <pre className="sd-chat-bubble-txt">{m.content}</pre>
             </div>

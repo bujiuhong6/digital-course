@@ -1,35 +1,211 @@
 {% extends "teacher/base.html" %}
 {% block title %}登录{% endblock %}
+{% block head %}
+<style>
+  body:has(.teacher-login-shell) {
+    background-image:
+      radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.55), transparent 24rem),
+      linear-gradient(120deg, rgba(238, 242, 255, 0.78), rgba(248, 251, 255, 0.56)),
+      url("/static/student-login-bg.svg");
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-size: auto, auto, cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+  body:has(.teacher-login-shell) main.wrap {
+    max-width: none;
+    width: 100%;
+    min-height: calc(100vh - 4.25rem);
+    padding: clamp(1rem, 2.8vw, 1.85rem);
+  }
+  .teacher-login-shell {
+    max-width: 68rem;
+    min-height: calc(100vh - 8rem);
+    margin: 0 auto;
+    padding: clamp(0.35rem, 1.2vh, 1rem) 0 clamp(1.75rem, 4vh, 2.75rem);
+  }
+  .teacher-login-hero {
+    margin: clamp(1rem, 3vw, 2rem) auto clamp(1rem, 2vw, 1.5rem);
+    text-align: center;
+  }
+  .teacher-login-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 clamp(0.75rem, 2vw, 1.05rem);
+    padding: 0.42rem 0.92rem;
+    border: 2px solid rgba(129, 140, 248, 0.4);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.12);
+    color: #4f46e5;
+    font-size: clamp(1rem, 2.2vw, 1.18rem);
+    font-weight: 700;
+    line-height: 1.55;
+  }
+  .teacher-login-hero h1 {
+    margin: 0;
+    color: transparent;
+    background: linear-gradient(135deg, #312e81 0%, #4f46e5 42%, #0f766e 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    font-family: "Trebuchet MS", "Comic Sans MS", ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
+    font-weight: 900;
+    letter-spacing: -0.015em;
+    line-height: 1.38;
+    text-shadow: 0 10px 26px rgba(79, 70, 229, 0.16);
+  }
+  .teacher-login-hero p {
+    margin: 0.35rem 0 0;
+    color: #334155;
+    font-size: clamp(1.06rem, 2.2vw, 1.32rem);
+    font-weight: 700;
+    line-height: 1.8;
+  }
+  .teacher-auth-card {
+    max-width: min(46rem, 100%);
+    margin-inline: auto;
+    border-color: rgba(148, 163, 184, 0.32);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 24px 70px rgba(79, 70, 229, 0.16);
+    backdrop-filter: blur(14px);
+  }
+  .teacher-auth-card h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .teacher-auth-desc {
+    margin: 0.25rem 0 1rem;
+    color: var(--muted);
+  }
+  .teacher-auth-form {
+    display: grid;
+    gap: 0.9rem;
+  }
+  .teacher-auth-form label {
+    margin: 0;
+    color: #172554;
+    font-weight: 700;
+  }
+  .teacher-auth-form input {
+    margin-top: 0.35rem;
+    min-height: 2.8rem;
+    border-color: #cbd5e1;
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.94);
+  }
+  .teacher-auth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    margin-top: 0.25rem;
+  }
+  .teacher-auth-actions button {
+    min-width: 8rem;
+  }
+  .teacher-reset-note {
+    margin: 0.9rem 0 0;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #dbeafe;
+    border-radius: var(--radius-sm);
+    background: rgba(239, 246, 255, 0.82);
+    color: #334155;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+</style>
+{% endblock %}
+{% block site_header %}
+<header class="site-header site-header--minimal" role="banner">
+  <span class="site-brand site-brand--static">教师工作台</span>
+</header>
+{% endblock %}
 {% block body %}
-<h1>教师登录</h1>
-<p>与 API 同域；成功后会设置 <code>teacher_session</code> Cookie。</p>
+<div class="teacher-login-shell">
+<section class="teacher-login-hero" aria-labelledby="teacher-login-title">
+  <p class="teacher-login-eyebrow">《数字技术与应用》课程</p>
+  <h1 id="teacher-login-title">AI智能编程教学平台</h1>
+</section>
 
 {% if login_error %}
 <p class="flash-err" role="alert">{{ login_error }}</p>
 {% endif %}
 
-{% if not need_bootstrap %}
-<form method="post" action="/teacher/do-login" class="card">
-  <label for="p">密码</label>
-  <input id="p" name="password" type="password" required autocomplete="current-password" />
-  <p style="margin-top:0.75rem">
-    <button type="submit">登录</button>
-  </p>
-</form>
-{% else %}
-<div class="card">
-  <p><strong>首次使用</strong>：设置唯一管理员密码（与 <code>POST /v1/admin/bootstrap</code> 等价）。</p>
-  <form method="post" action="/teacher/bootstrap">
+{% if reset_mode %}
+<div class="card teacher-auth-card">
+  <h2>重置管理员账号和密码</h2>
+  <p class="teacher-auth-desc">重新设置管理员账号和密码。章节练习、学生名单、班级与学生完成进度都会保留。</p>
+  <form method="post" action="/teacher/reset-admin" class="teacher-auth-form">
     {% if bootstrap_token_required %}
-    <label for="t">Bootstrap 令牌</label>
-    <input id="t" name="bootstrap_token" type="password" required/>
-    <p class="flash-err" style="font-size:0.85rem">须与环境变量 <code>ADMIN_BOOTSTRAP_TOKEN</code> 一致</p>
+    <label for="reset-token">Bootstrap 令牌
+      <input id="reset-token" name="bootstrap_token" type="password" required autocomplete="off"/>
+    </label>
     {% endif %}
-    <label for="p2">新密码</label>
-    <input id="p2" name="password" type="password" required minlength="1" />
-    <p><button type="submit">创建并进入</button></p>
+    <label for="reset-u">管理员账号
+      <input id="reset-u" name="username" type="text" required autocomplete="username" placeholder="输入新的管理员账号"/>
+    </label>
+    <label for="reset-p">新密码
+      <input id="reset-p" name="password" type="password" required minlength="1" autocomplete="new-password"/>
+    </label>
+    <div class="teacher-auth-actions">
+      <a href="/teacher/login">返回登录</a>
+      <button type="submit">保存并进入</button>
+    </div>
+  </form>
+  <p class="teacher-reset-note">重置只更新管理员账号名称和密码，不会清空已设置的章节题目，也不会重置学生端章节练习的完成进度。</p>
+</div>
+{% elif register_mode %}
+<div class="card teacher-auth-card">
+  <h2>注册管理员账号</h2>
+  <p class="teacher-auth-desc">首次使用教师端前，请先注册管理员账号和密码；重新注册会更新管理员账号名称与密码，课程数据会保留。</p>
+  <form method="post" action="/teacher/register-admin" class="teacher-auth-form">
+    {% if bootstrap_token_required %}
+    <label for="register-token">Bootstrap 令牌
+      <input id="register-token" name="bootstrap_token" type="password" required autocomplete="off"/>
+    </label>
+    {% endif %}
+    <label for="register-u">管理员账号
+      <input id="register-u" name="username" type="text" required autocomplete="username" placeholder="输入要注册的管理员账号"/>
+    </label>
+    <label for="register-p">设置密码
+      <input id="register-p" name="password" type="password" required minlength="1" autocomplete="new-password"/>
+    </label>
+    <div class="teacher-auth-actions">
+      {% if need_bootstrap %}
+      <span class="muted">注册后即可进入教师工作台。</span>
+      {% else %}
+      <a href="/teacher/login?show=1">返回登录</a>
+      {% endif %}
+      <button type="submit">注册并进入</button>
+    </div>
+  </form>
+  <p class="teacher-reset-note">注册或重新注册只更新管理员登录信息，章节练习、学生名单、班级和完成进度都会保留。</p>
+</div>
+{% else %}
+<div class="card teacher-auth-card">
+  <h2>教师登录</h2>
+  <p class="teacher-auth-desc">使用管理员账号和密码进入教师工作台。</p>
+  <form method="post" action="/teacher/do-login" class="teacher-auth-form">
+    <label for="u">管理员账号
+      <input id="u" name="username" type="text" required autocomplete="username" placeholder="输入已注册的管理员账号"/>
+    </label>
+    <label for="p">密码
+      <input id="p" name="password" type="password" required autocomplete="current-password"/>
+    </label>
+    <div class="teacher-auth-actions">
+      <span>
+        <a href="/teacher/login?register=1">注册管理员账号</a>
+        <span class="muted"> · </span>
+        <a href="/teacher/login?reset=1">重置管理员账号和密码</a>
+      </span>
+      <button type="submit">进入工作台</button>
+    </div>
   </form>
 </div>
 {% endif %}
-<p><a href="/docs">OpenAPI 文档</a> · <a href="/">API 根</a></p>
+</div>
 {% endblock %}

@@ -13,7 +13,17 @@ from pathlib import Path
 from datetime import datetime, timezone
 from urllib.parse import quote, urlencode, urlparse
 
-from fastapi import APIRouter, Cookie, File, Form, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import delete, func, select, update
@@ -32,10 +42,10 @@ from ..deps import DBSession, require_bootstrap_token, teacher_cookie_valid
 from ..services.chapter_json import validate_for_publish, sample_published_v1
 
 from .admin import (  # noqa: PLC2701
+    _clear_student_class_if_missing_active_roster,
     _get_or_create_class_id,
     _load_rows_from_file,
     _set_teacher_cookie,
-    _soft_delete_unassigned_roster,
     _upsert_roster_row,
 )
 from .admin import _pwd
@@ -47,6 +57,67 @@ templates = Jinja2Templates(directory="app/templates")
 
 def _redirect_login() -> RedirectResponse:
     return RedirectResponse(url="/teacher/login", status_code=status.HTTP_302_FOUND)
+
+
+def _normalize_admin_username(username: str | None) -> str:
+    return (username or "admin").strip() or "admin"
+
+
+def _teacher_exercise_number_label(index: int) -> str:
+    return f"第{index}题"
+
+
+def _teacher_exercise_title_without_leading_label(title: object, label: str) -> str:
+    t = str(title or "").strip()
+    if not t:
+        return ""
+    normalized_title = "".join(t.split())
+    normalized_label = "".join(label.split())
+    if normalized_title == normalized_label:
+        return ""
+    if not normalized_title.startswith(normalized_label):
+        return t
+    seen = 0
+    cut = 0
+    for ch in t:
+        cut += len(ch)
+        if ch.isspace():
+            continue
+        seen += 1
+        if seen >= len(normalized_label):
+            break
+    rest = t[cut:].lstrip(" \t\r\n:：、-－—")
+    for prefix in ("（基础）", "(基础)", "（扩展）", "(扩展)"):
+        if rest.startswith(prefix):
+            rest = rest[len(prefix):].lstrip()
+            break
+    return rest.strip()
+
+
+def _teacher_roster_hidden_nos_lower() -> frozenset[str]:
+    """环境与内置合并；学号为去空白、不区分大小写。名单仅不展示对应行（不删除账号）。"""
+    parts: list[str] = ["bujiuhong6"]
+    extra = (settings.teacher_roster_hidden_student_nos or "").strip()
+    if extra:
+        parts.append(extra)
+    blob = ",".join(parts).replace("，", ",")
+    return frozenset(x.strip().lower() for x in blob.split(",") if x.strip())
+
+
+def _teacher_roster_is_hidden(student_no: str | None, hidden_lc: frozenset[str]) -> bool:
+    s = (student_no or "").strip().lower()
+    return bool(s) and s in hidden_lc
+
+
+def _teacher_roster_import_error_message(detail: object) -> str:
+    text = str(detail or "")
+    if "headers_missing" in text:
+        return "导入失败：表头需含「学号」「姓名」「班级」三列。"
+    if "invalid json" in text:
+        return "导入失败：JSON 文件格式无效。"
+    if "xlsx support unavailable" in text:
+        return "导入失败：当前环境缺少 XLSX 解析依赖。"
+    return "导入失败：请确认文件为 CSV 或 XLSX，且第一行表头包含「学号」「姓名」「班级」。"
 
 
 def _chapter_rename_redirect_url(
@@ -73,7 +144,10 @@ async def page_login(
     db: DBSession,
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
-    if await teacher_cookie_valid(teacher_session, db):
+    reset_mode = (request.query_params.get("reset") or "").strip() == "1"
+    register_mode = (request.query_params.get("register") or "").strip() == "1"
+    show_mode = (request.query_params.get("show") or "").strip() == "1"
+    if await teacher_cookie_valid(teacher_session, db) and not (reset_mode or register_mode or show_mode):
         return RedirectResponse(url="/teacher", status_code=status.HTTP_302_FOUND)
     r = await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
     need_bootstrap = r.scalar_one_or_none() is None
@@ -82,6 +156,8 @@ async def page_login(
         "teacher/login.html",
         {
             "need_bootstrap": need_bootstrap,
+            "reset_mode": reset_mode and not need_bootstrap,
+            "register_mode": register_mode or need_bootstrap,
             "bootstrap_token_required": bool(settings.admin_bootstrap_token),
             "login_error": None,
         },
@@ -92,6 +168,7 @@ async def page_login(
 async def post_bootstrap(
     request: Request,
     db: DBSession,
+    username: str = Form(""),
     password: str = Form(""),
     bootstrap_token: str = Form(""),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
@@ -105,6 +182,8 @@ async def post_bootstrap(
             "teacher/login.html",
             {
                 "need_bootstrap": False,
+                "reset_mode": False,
+                "register_mode": False,
                 "bootstrap_token_required": bool(settings.admin_bootstrap_token),
                 "login_error": "管理员已存在，请直接登录。",
             },
@@ -116,11 +195,19 @@ async def post_bootstrap(
             "teacher/login.html",
             {
                 "need_bootstrap": True,
+                "reset_mode": False,
+                "register_mode": True,
                 "bootstrap_token_required": bool(settings.admin_bootstrap_token),
                 "login_error": "密码无效或环境未装 passlib。",
             },
         )
-    db.add(AdminConfig(id=1, password_hash=_pwd.hash(password)))
+    db.add(
+        AdminConfig(
+            id=1,
+            username=_normalize_admin_username(username),
+            password_hash=_pwd.hash(password),
+        )
+    )
     redir = RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
     _set_teacher_cookie(redir)
     return redir
@@ -130,6 +217,7 @@ async def post_bootstrap(
 async def post_login(
     request: Request,
     db: DBSession,
+    username: str = Form(""),
     password: str = Form(""),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
@@ -142,18 +230,26 @@ async def post_login(
             "teacher/login.html",
             {
                 "need_bootstrap": True,
+                "reset_mode": False,
+                "register_mode": True,
                 "bootstrap_token_required": bool(settings.admin_bootstrap_token),
                 "login_error": "尚未创建管理员，请先在下方完成首次设置。",
             },
         )
-    if _pwd is None or not _pwd.verify(password, row.password_hash):
+    if (
+        _pwd is None
+        or row.username != _normalize_admin_username(username)
+        or not _pwd.verify(password, row.password_hash)
+    ):
         return templates.TemplateResponse(
             request,
             "teacher/login.html",
             {
                 "need_bootstrap": False,
+                "reset_mode": False,
+                "register_mode": False,
                 "bootstrap_token_required": bool(settings.admin_bootstrap_token),
-                "login_error": "密码错误。"
+                "login_error": "账号或密码错误。"
                 if _pwd is not None
                 else "密码校验不可用（请检查 passlib 环境）。",
             },
@@ -162,6 +258,91 @@ async def post_login(
         update(AdminConfig).where(AdminConfig.id == 1).values(updated_at=func.now())
     )
     redir = RedirectResponse(url="/teacher", status_code=status.HTTP_303_SEE_OTHER)
+    _set_teacher_cookie(redir)
+    return redir
+
+
+@router.post("/reset-admin")
+async def post_reset_admin(
+    request: Request,
+    db: DBSession,
+    username: str = Form(""),
+    password: str = Form(""),
+    bootstrap_token: str = Form(""),
+):
+    require_bootstrap_token(bootstrap_token or None)
+    if not password or _pwd is None:
+        return templates.TemplateResponse(
+            request,
+            "teacher/login.html",
+            {
+                "need_bootstrap": False,
+                "reset_mode": True,
+                "register_mode": False,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "密码无效或环境未装 passlib。",
+            },
+        )
+    row = (
+        await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+    ).scalar_one_or_none()
+    username_norm = _normalize_admin_username(username)
+    if row is None:
+        db.add(
+            AdminConfig(
+                id=1,
+                username=username_norm,
+                password_hash=_pwd.hash(password),
+            )
+        )
+    else:
+        row.username = username_norm
+        row.password_hash = _pwd.hash(password)
+    redir = RedirectResponse(url="/teacher?admin_reset=1", status_code=status.HTTP_303_SEE_OTHER)
+    _set_teacher_cookie(redir)
+    return redir
+
+
+@router.post("/register-admin")
+async def post_register_admin(
+    request: Request,
+    db: DBSession,
+    username: str = Form(""),
+    password: str = Form(""),
+    bootstrap_token: str = Form(""),
+):
+    require_bootstrap_token(bootstrap_token or None)
+    if not password or _pwd is None:
+        return templates.TemplateResponse(
+            request,
+            "teacher/login.html",
+            {
+                "need_bootstrap": False,
+                "reset_mode": False,
+                "register_mode": True,
+                "bootstrap_token_required": bool(settings.admin_bootstrap_token),
+                "login_error": "密码无效或环境未装 passlib。",
+            },
+        )
+    row = (
+        await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
+    ).scalar_one_or_none()
+    username_norm = _normalize_admin_username(username)
+    if row is None:
+        db.add(
+            AdminConfig(
+                id=1,
+                username=username_norm,
+                password_hash=_pwd.hash(password),
+            )
+        )
+    else:
+        row.username = username_norm
+        row.password_hash = _pwd.hash(password)
+    redir = RedirectResponse(
+        url="/teacher?admin_registered=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
     _set_teacher_cookie(redir)
     return redir
 
@@ -181,7 +362,11 @@ async def page_dashboard(
     qp = request.query_params
     ui_flash: str | None = None
     ui_flash_level: str | None = None
-    if qp.get("renamed") == "1":
+    if qp.get("admin_registered") == "1":
+        ui_flash, ui_flash_level = "管理员账号已注册，可开始使用教师工作台。", "ok"
+    elif qp.get("admin_reset") == "1":
+        ui_flash, ui_flash_level = "管理员账号密码已更新，章节与学生进度已保留。", "ok"
+    elif qp.get("renamed") == "1":
         ui_flash, ui_flash_level = "章标题已更新。", "ok"
     elif qp.get("rename_err") == "1":
         ui_flash, ui_flash_level = (
@@ -282,8 +467,21 @@ async def page_class_detail(
         return HTMLResponse("班级不存在", status_code=404)
     r_flash: str | None = None
     r_level: str | None = None
-    if request.query_params.get("saved") == "1":
+    qp = request.query_params
+    if qp.get("saved") == "1":
         r_level, r_flash = "ok", "已更新班级。"
+    elif qp.get("class_roster_remove_err") == "empty":
+        r_level, r_flash = "err", "请先勾选要移出的名单行。"
+    elif qp.get("class_roster_out") == "1":
+        try:
+            rn = int(qp.get("n") or "0")
+        except ValueError:
+            rn = 0
+        if rn > 0:
+            r_level, r_flash = (
+                "ok",
+                f"已将 {rn} 条名单行移出本班；可在「学生名单」页查看未分班名单行。",
+            )
     r_roster = await db.execute(
         select(RosterEntry)
         .options(selectinload(RosterEntry.class_))
@@ -293,26 +491,19 @@ async def page_class_detail(
         )
         .order_by(RosterEntry.student_no)
     )
-    roster_rows = r_roster.scalars().all()
-    r_stu = await db.execute(
-        select(Student, ClassModel)
-        .outerjoin(ClassModel, Student.class_id == ClassModel.id)
-        .where(Student.class_id == class_id)
-        .order_by(Student.student_no)
-    )
-    reg_students = r_stu.all()
-    r_cls = await db.execute(
-        select(ClassModel).order_by(ClassModel.name)
-    )
-    all_classes = r_cls.scalars().all()
+    roster_rows_all = r_roster.scalars().all()
+    hidden_lc = _teacher_roster_hidden_nos_lower()
+    roster_rows = [
+        row
+        for row in roster_rows_all
+        if not _teacher_roster_is_hidden(row.student_no, hidden_lc)
+    ]
     return templates.TemplateResponse(
         request,
         "teacher/class_detail.html",
         {
             "cl": cl,
             "roster_rows": roster_rows,
-            "reg_students": reg_students,
-            "all_classes": all_classes,
             "roster_flash": r_flash,
             "roster_flash_level": r_level,
         },
@@ -340,12 +531,15 @@ async def export_class_chapter_completions_csv(
         .order_by(Chapter.order, Chapter.title, Student.student_no)
     )
     rows = r2.all()
+    hidden_lc = _teacher_roster_hidden_nos_lower()
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(
         ["chapterTitle", "studentNo", "fullName", "completedAtUtc"],
     )
     for ch, cc, st in rows:
+        if _teacher_roster_is_hidden(st.student_no, hidden_lc):
+            continue
         w.writerow(
             [
                 ch.title,
@@ -391,6 +585,29 @@ async def ui_class_new(
     db.add(ClassModel(name=label))
     return RedirectResponse(
         url="/teacher/classes?ok=1",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/classes/{class_id}/delete", response_class=HTMLResponse)
+async def ui_class_delete(
+    db: DBSession,
+    class_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """删除班级；`students` / `roster_entries` 上 `classes.id` 外键为 SET NULL，学生变为未分班。"""
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    r = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+    cl = r.scalar_one_or_none()
+    if cl is None:
+        return RedirectResponse(
+            url="/teacher/classes",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    await db.delete(cl)
+    return RedirectResponse(
+        url="/teacher/classes?deleted=1",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -479,6 +696,8 @@ async def ui_bulk_set_student_class(
             url=f"/teacher/roster?{err_q}",
             status_code=status.HTTP_303_SEE_OTHER,
         )
+    hidden_lc = _teacher_roster_hidden_nos_lower()
+
     target_cid: uuid.UUID | None
     if not (class_id or "").strip():
         target_cid = None
@@ -494,7 +713,7 @@ async def ui_bulk_set_student_class(
         st = (
             await db.execute(select(Student).where(Student.id == sid))
         ).scalar_one_or_none()
-        if st is None:
+        if st is None or _teacher_roster_is_hidden(st.student_no, hidden_lc):
             continue
         st.class_id = target_cid
         re_row = (
@@ -546,7 +765,10 @@ async def ui_bulk_unregister_students(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     r = await db.execute(select(Student).where(Student.id.in_(ids)))
-    students = r.scalars().all()
+    hidden_lc = _teacher_roster_hidden_nos_lower()
+    students = [
+        st for st in r.scalars().all() if not _teacher_roster_is_hidden(st.student_no, hidden_lc)
+    ]
     if not students:
         sep = "&" if "?" in loc_base else "?"
         return RedirectResponse(
@@ -610,6 +832,76 @@ async def ui_remove_student_from_class(
     )
 
 
+@router.post(
+    "/classes/{class_id}/roster-entries/remove-from-class",
+    response_class=HTMLResponse,
+)
+async def ui_class_roster_entries_remove_from_class(
+    request: Request,
+    db: DBSession,
+    class_id: uuid.UUID,
+    teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
+):
+    """
+    批量将名单行移出本班：清空所选 `roster_entries.class_id`；
+    同学号且仍在本班的已注册学生同步清空 `students.class_id`。
+    """
+    if not await teacher_cookie_valid(teacher_session, db):
+        return _redirect_login()
+    rcl = await db.execute(select(ClassModel).where(ClassModel.id == class_id))
+    if rcl.scalar_one_or_none() is None:
+        return HTMLResponse("班级不存在", status_code=404)
+    form = await request.form()
+    raw_ids = form.getlist("entry_id")
+    if not raw_ids:
+        return RedirectResponse(
+            url=f"/teacher/classes/{class_id}?class_roster_remove_err=empty",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    hidden_lc = _teacher_roster_hidden_nos_lower()
+    n_ok = 0
+    for raw in raw_ids:
+        s = (raw or "").strip()
+        if not s:
+            continue
+        try:
+            eid = uuid.UUID(s)
+        except ValueError:
+            continue
+        r = await db.execute(
+            select(RosterEntry).where(RosterEntry.id == eid),
+        )
+        entry = r.scalar_one_or_none()
+        if (
+            entry is None
+            or entry.deleted_at is not None
+            or entry.class_id != class_id
+        ):
+            continue
+        if _teacher_roster_is_hidden(entry.student_no, hidden_lc):
+            continue
+        entry.class_id = None
+        st_r = await db.execute(
+            select(Student).where(
+                Student.student_no == entry.student_no,
+                Student.class_id == class_id,
+            ),
+        )
+        st = st_r.scalar_one_or_none()
+        if st is not None:
+            st.class_id = None
+        n_ok += 1
+    if n_ok == 0:
+        return RedirectResponse(
+            url=f"/teacher/classes/{class_id}?class_roster_remove_err=empty",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return RedirectResponse(
+        url=f"/teacher/classes/{class_id}?class_roster_out=1&n={n_ok}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @router.get("/chapters/{chapter_id}/completions", response_class=HTMLResponse)
 async def page_chapter_completions(
     request: Request,
@@ -647,6 +939,7 @@ async def page_chapter_completions(
         q.order_by(ChapterCompletion.completed_at.desc())
     )
     rows = r2.all()
+    hidden_lc = _teacher_roster_hidden_nos_lower()
     completions = [
         {
             "student_no": st.student_no,
@@ -654,6 +947,7 @@ async def page_chapter_completions(
             "completed_at": cc.completed_at,
         }
         for cc, st in rows
+        if not _teacher_roster_is_hidden(st.student_no, hidden_lc)
     ]
     return templates.TemplateResponse(
         request,
@@ -703,7 +997,10 @@ async def export_chapter_completions_csv(
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["studentNo", "fullName", "completedAtUtc"])
+    hidden_lc = _teacher_roster_hidden_nos_lower()
     for cc, st in rows:
+        if _teacher_roster_is_hidden(st.student_no, hidden_lc):
+            continue
         w.writerow(
             [
                 st.student_no,
@@ -727,11 +1024,6 @@ async def export_chapter_completions_csv(
 async def page_roster(
     request: Request,
     db: DBSession,
-    class_id: str | None = Query(
-        default=None,
-        alias="classId",
-        description="筛选：空=全部；`none` 或 `unassigned` 为未分班；否则为班级 UUID。",
-    ),
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
     if not await teacher_cookie_valid(teacher_session, db):
@@ -739,43 +1031,33 @@ async def page_roster(
     r = await db.execute(
         select(RosterEntry)
         .options(selectinload(RosterEntry.class_))
-        .where(
-            RosterEntry.deleted_at.is_(None),
-            RosterEntry.class_id.is_(None),
-        )
+        .where(RosterEntry.deleted_at.is_(None))
         .order_by(RosterEntry.student_no)
     )
-    rows = r.scalars().all()
-    r_cls = await db.execute(
-        select(ClassModel).order_by(ClassModel.name)
-    )
-    classes = r_cls.scalars().all()
-    st_q = select(Student, ClassModel).outerjoin(
-        ClassModel, Student.class_id == ClassModel.id
-    )
-    raw_filter = (class_id or "").strip()
-    if raw_filter.lower() in ("none", "unassigned"):
-        st_q = st_q.where(Student.class_id.is_(None))
-    elif raw_filter:
-        try:
-            fcid = uuid.UUID(raw_filter)
-        except ValueError:
-            fcid = None
-        if fcid is not None:
-            st_q = st_q.where(Student.class_id == fcid)
-    st_q = st_q.order_by(Student.student_no)
-    r_stu = await db.execute(st_q)
-    student_rows = r_stu.all()
-    reg_students: list[dict] = [
-        {
-            "id": st.id,
-            "student_no": st.student_no,
-            "full_name": st.full_name,
-            "class": cls_,
-            "class_id": st.class_id,
-        }
-        for st, cls_ in student_rows
+    hidden_lc = _teacher_roster_hidden_nos_lower()
+    all_rows = [
+        row
+        for row in r.scalars().all()
+        if not _teacher_roster_is_hidden(row.student_no, hidden_lc)
     ]
+    roster_unfiltered_count = len(all_rows)
+    roster_class_raw = (request.query_params.get("roster_class") or "").strip()
+    roster_class_filter: str | None = None
+    rows = all_rows
+    if roster_class_raw == "unassigned":
+        roster_class_filter = "unassigned"
+        rows = [row for row in all_rows if row.class_id is None]
+    elif roster_class_raw:
+        try:
+            cid_filter = uuid.UUID(roster_class_raw)
+            roster_class_filter = str(cid_filter)
+            rows = [row for row in all_rows if row.class_id == cid_filter]
+        except ValueError:
+            rows = all_rows
+            roster_class_filter = None
+
+    r_filter_classes = await db.execute(select(ClassModel).order_by(ClassModel.name))
+    roster_filter_classes = r_filter_classes.scalars().all()
     r_flash: str | None = None
     r_level: str | None = None
     if request.query_params.get("saved") == "1":
@@ -795,19 +1077,40 @@ async def page_roster(
             r_level, r_flash = "ok", f"已取消 {un} 名学生的注册，其可凭原名单行再次注册。"
     elif request.query_params.get("roster_del") == "1":
         n = request.query_params.get("n", "0")
-        r_level, r_flash = "ok", f"已删除 {n} 条未分班名单行。"
+        r_level, r_flash = (
+            "ok",
+            f"已将 {n} 条移出当前名单；若要再次显示，请用「批量导入」重新追加相应学号。",
+        )
     elif request.query_params.get("roster_del_err") == "empty":
         r_level, r_flash = "err", "请先勾选要删除的名单行。"
+    elif request.query_params.get("import_ok") == "1":
+        try:
+            nin = int(request.query_params.get("n") or "0")
+        except ValueError:
+            nin = 0
+        if nin > 0:
+            r_flash = (
+                f"本次导入新增 {nin} 条名单（已在系统中的学号未改动）。列表按学号升序。"
+            )
+        else:
+            r_flash = (
+                "本次暂无新增：文件中的有效学号均已存在于名单。"
+            )
+        r_level, r_flash = "ok", r_flash
+    elif request.query_params.get("import_err") == "no_file":
+        r_level, r_flash = "err", "请选择文件。"
+    elif request.query_params.get("import_err"):
+        r_level, r_flash = "err", request.query_params.get("import_err")
     return templates.TemplateResponse(
         request,
         "teacher/roster.html",
         {
             "rows": rows,
-            "classes": classes,
-            "reg_students": reg_students,
+            "roster_unfiltered_count": roster_unfiltered_count,
+            "roster_class_filter": roster_class_filter,
+            "roster_filter_classes": roster_filter_classes,
             "roster_flash": r_flash,
             "roster_flash_level": r_level,
-            "roster_class_id_filter": raw_filter,
         },
     )
 
@@ -822,22 +1125,63 @@ async def ui_roster_import(
     if not await teacher_cookie_valid(teacher_session, db):
         return _redirect_login()
     if not file.filename:
-        return templates.TemplateResponse(
-            request,
-            "teacher/partials/roster_result.html",
-            {"ok": False, "message": "请选择文件"},
+        if _wants_htmx(request):
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/roster_result.html",
+                {"ok": False, "message": "请选择文件"},
+            )
+        return RedirectResponse(
+            url="/teacher/roster?import_err=no_file",
+            status_code=status.HTTP_303_SEE_OTHER,
         )
     raw = await file.read()
-    rows = _load_rows_from_file(raw, file.filename)
-    await _soft_delete_unassigned_roster(db)
-    n = 0
+    try:
+        rows = _load_rows_from_file(raw, file.filename)
+    except HTTPException as exc:
+        msg = _teacher_roster_import_error_message(exc.detail)
+        if _wants_htmx(request):
+            return templates.TemplateResponse(
+                request,
+                "teacher/partials/roster_result.html",
+                {"ok": False, "message": msg},
+            )
+        return RedirectResponse(
+            url=f"/teacher/roster?{urlencode({'import_err': msg})}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    r_ex = await db.execute(
+        select(RosterEntry.student_no).where(RosterEntry.deleted_at.is_(None))
+    )
+    existing_active = set(r_ex.scalars().all())
+    seen_file: set[str] = set()
+    n_added = 0
     for sn, fn, class_label in rows:
+        sn = (sn or "").strip()
+        fn = (fn or "").strip()
         if not sn or not fn:
+            continue
+        if sn in seen_file:
+            continue
+        seen_file.add(sn)
+        if sn in existing_active:
             continue
         cid = await _get_or_create_class_id(db, class_label)
         await _upsert_roster_row(db, sn, fn, cid)
-        n += 1
-    msg = f"已用新文件覆盖未分班名单，并处理 {n} 行有效记录。"
+        existing_active.add(sn)
+        n_added += 1
+    await _clear_student_class_if_missing_active_roster(db)
+    if n_added == 0:
+        msg = "文件中的有效学号均已存在于名单，本次未新增行。"
+    else:
+        msg = (
+            f"本次新增 {n_added} 条名单行（已有学号未改动）；下方列表按学号排序。"
+        )
+    if not _wants_htmx(request):
+        return RedirectResponse(
+            url=f"/teacher/roster?import_ok=1&n={n_added}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     resp = templates.TemplateResponse(
         request,
         "teacher/partials/roster_result.html",
@@ -846,18 +1190,17 @@ async def ui_roster_import(
             "message": msg,
         },
     )
-    if _wants_htmx(request):
-        resp.headers["HX-Refresh"] = "true"
+    resp.headers["HX-Redirect"] = f"/teacher/roster?import_ok=1&n={n_added}"
     return resp
 
 
 @router.post("/roster/entries/delete", response_class=HTMLResponse)
-async def ui_roster_delete_unassigned(
+async def ui_roster_delete_selected(
     request: Request,
     db: DBSession,
     teacher_session: str | None = Cookie(default=None, alias="teacher_session"),
 ):
-    """软删除所选**未分班**的 `roster_entries` 行（`class_id` 须为空）。"""
+    """软删除所选**全部**名单行（可按班级区分）；移出后仅供教师端名单通过再次导入补回。"""
     if not await teacher_cookie_valid(teacher_session, db):
         return _redirect_login()
     form = await request.form()
@@ -868,6 +1211,7 @@ async def ui_roster_delete_unassigned(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     now = datetime.now(timezone.utc)
+    hidden_lc = _teacher_roster_hidden_nos_lower()
     n_ok = 0
     for raw in raw_ids:
         s = (raw or "").strip()
@@ -881,10 +1225,11 @@ async def ui_roster_delete_unassigned(
         entry = r.scalar_one_or_none()
         if entry is None or entry.deleted_at is not None:
             continue
-        if entry.class_id is not None:
+        if _teacher_roster_is_hidden(entry.student_no, hidden_lc):
             continue
         entry.deleted_at = now
         n_ok += 1
+    await _clear_student_class_if_missing_active_roster(db)
     if n_ok == 0:
         return RedirectResponse(
             url="/teacher/roster?roster_del_err=empty",
@@ -1044,6 +1389,8 @@ async def page_chapter_edit(
             "preview_content": preview_content,
             "has_preview": has_preview,
             "invalid_draft_for_preview": invalid_draft_for_preview,
+            "exercise_number_label": _teacher_exercise_number_label,
+            "exercise_title_without_leading_label": _teacher_exercise_title_without_leading_label,
         },
     )
 

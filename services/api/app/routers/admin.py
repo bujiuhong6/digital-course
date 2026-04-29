@@ -48,7 +48,18 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto") if CryptContext else 
 class PasswordBody(BaseModel):
     model_config = {"populate_by_name": True}
 
+    username: str = Field(
+        default="admin",
+        min_length=1,
+        max_length=128,
+        description="管理员账号",
+        alias="username",
+    )
     password: str = Field(min_length=1, description="管理员密码", alias="password")
+
+
+def _normalize_admin_username(username: str | None) -> str:
+    return (username or "admin").strip() or "admin"
 
 
 def _set_teacher_cookie(response: Response) -> None:
@@ -86,7 +97,13 @@ async def bootstrap(
     if _pwd is None:
         raise RuntimeError("passlib not installed")
     h = _pwd.hash(body.password)
-    db.add(AdminConfig(id=1, password_hash=h))
+    db.add(
+        AdminConfig(
+            id=1,
+            username=_normalize_admin_username(body.username),
+            password_hash=h,
+        )
+    )
     _set_teacher_cookie(response)
     return {"ok": True}
 
@@ -96,7 +113,13 @@ async def login(body: PasswordBody, response: Response, db: DBSession) -> dict:
     """校验 bcrypt 后设置 `teacher_session`（HttpOnly、签名，见模块文档字符串）。"""
     r = await db.execute(select(AdminConfig).where(AdminConfig.id == 1))
     row = r.scalar_one_or_none()
-    if row is None or _pwd is None or not _pwd.verify(body.password, row.password_hash):
+    username = _normalize_admin_username(body.username)
+    if (
+        row is None
+        or _pwd is None
+        or row.username != username
+        or not _pwd.verify(body.password, row.password_hash)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials",
         )
@@ -249,27 +272,38 @@ def _load_rows_from_file(content: bytes, filename: str) -> list[tuple[str, str, 
     return list(_iter_csv_rows(text))
 
 
-async def _soft_delete_unassigned_roster(db: DBSession) -> int:
+async def _soft_delete_all_active_roster(db: DBSession) -> int:
     """
-    将「未分班」的名单行全部标记删除，用于**新一次导入**全量覆盖「当前名单行」
-   （仅 `class_id` 为空的记录；已分入某班的名单行保留）。
+    将当前**全部**未软删的名单行标记删除；新一次导入会先执行本步骤再写入文件行，
+    使名单与文件内容一致（含已分班学号也会先移除再按文件重建）。
     """
     now = datetime.now(timezone.utc)
-    r = await db.execute(
-        select(RosterEntry.id).where(
-            RosterEntry.deleted_at.is_(None),
-            RosterEntry.class_id.is_(None),
-        )
-    )
+    r = await db.execute(select(RosterEntry.id).where(RosterEntry.deleted_at.is_(None)))
     ids = list(r.scalars().all())
     if not ids:
         return 0
     await db.execute(
         update(RosterEntry)
         .where(RosterEntry.id.in_(ids))
-        .values(deleted_at=now)
+        .values(deleted_at=now),
     )
     return len(ids)
+
+
+async def _clear_student_class_if_missing_active_roster(db: DBSession) -> None:
+    """无活跃名单行（已全量软删且未在本次导入中写回）的学生，清空班级。"""
+    rs = await db.execute(select(Student))
+    for st in rs.scalars().all():
+        chk = await db.execute(
+            select(RosterEntry.id)
+            .where(
+                RosterEntry.student_no == st.student_no,
+                RosterEntry.deleted_at.is_(None),
+            )
+            .limit(1),
+        )
+        if chk.scalar_one_or_none() is None:
+            st.class_id = None
 
 
 async def _get_or_create_class_id(
@@ -334,8 +368,8 @@ async def import_roster(
 ) -> dict:
     """
     导入或更新 `roster_entries`；尚无 `students` 学号时为 **pending**；已存在学号时 **bound** 并关联 `student_id`。
-    在写入文件行之前，会先**软删除全部「未分班」的现有 `roster_entries` 行**（`class_id` 为空），
-    使新文件成为**未分班名单**的全量结果；**已分入某班**的名单行不会被删除。
+    在写入文件行之前，会先**软删除全部**当前仍有效的 `roster_entries` 行，再按文件逐行写回，
+    因此新文件即**完整名单**（之前录入的学号若未出现在本次文件中，则不再保留名单行）。
 
     - **JSON**：`Content-Type: application/json`，body 为 `{"rows":[{"studentNo","fullName"},...]}` 或 **数组** 同上结构。
     - **文件**：`multipart/form-data`，`file` 为 `.csv` 或 `.json`。
@@ -362,7 +396,7 @@ async def import_roster(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="use application/json or multipart/form-data with file",
         )
-    await _soft_delete_unassigned_roster(db)
+    await _soft_delete_all_active_roster(db)
     n = 0
     for sn, fn, class_label in rows:
         if not sn or not fn:
@@ -370,6 +404,7 @@ async def import_roster(
         cid = await _get_or_create_class_id(db, class_label)
         await _upsert_roster_row(db, sn, fn, cid)
         n += 1
+    await _clear_student_class_if_missing_active_roster(db)
     return {"ok": True, "imported": n}
 
 

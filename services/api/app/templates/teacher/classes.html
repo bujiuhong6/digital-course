@@ -1,10 +1,9 @@
 {% extends "teacher/base.html" %}
-{% block title %}班级{% endblock %}
+{% block title %}班级管理{% endblock %}
 {% block body %}
-<div class="bar">
-  <h1>班级</h1>
-  <div class="bar-actions">
-    <a class="btn secondary" href="/teacher">返回概览</a>
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">班级管理</h1>
   </div>
 </div>
 
@@ -14,29 +13,43 @@
 <p class="flash-err" role="status">✗ 请填写班级名称。</p>
 {% elif request.query_params.get("dup") == "1" %}
 <p class="flash-err" role="status">✗ 该名称已存在，请用其他名称。</p>
+{% elif request.query_params.get("deleted") == "1" %}
+<p class="flash-ok" role="status">✓ 已删除班级；原班级内学生在名单中为未分班。</p>
 {% endif %}
 
 <div class="card">
-  <h2 style="margin-top:0">新建班级</h2>
+  <div class="section-header">
+    <h2>新建班级</h2>
+  </div>
   <form method="post" action="/teacher/classes/new">
     <label for="cn">班级名称</label>
-    <input id="cn" name="name" type="text" required maxlength="128" placeholder="例如：2026 春季 A 班"/>
-    <p><button type="submit">创建</button></p>
+    <input id="cn" name="name" type="text" required maxlength="128" placeholder="例如：24金融学"/>
+    <div class="form-actions">
+      <button type="submit">创建</button>
+    </div>
   </form>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">已有班级</h2>
+  <div class="section-header">
+    <h2>已有班级</h2>
+  </div>
   {% if not classes %}
   <p>暂无。请先新建。</p>
   {% else %}
-  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/roster">名单</a>」页将已注册学生分配到班级。点击下方班级可查看本班名单与导出练习完成情况。</p>
-  <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0.5rem">
+  <p class="muted" style="font-size:0.9rem;margin-bottom:1rem;line-height:1.5">在「<a href="/teacher/roster">名单</a>」页将已注册学生分配到班级。点击下方班级可查看本班名单与导出练习完成情况。</p>
+  <ul class="class-card-list">
     {% for c in classes %}
-    <li>
-      <a class="btn secondary" href="/teacher/classes/{{ c.id }}" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none;width:100%;max-width:40rem;box-sizing:border-box">
-        <span><strong>{{ c.name }}</strong></span>
-      </a>
+    <li class="class-card-row">
+      <a class="class-card-link" href="/teacher/classes/{{ c.id }}">{{ c.name }}</a>
+      <form
+        class="class-card-delete"
+        method="post"
+        action="/teacher/classes/{{ c.id }}/delete"
+        onsubmit="return confirm('确定删除该班级？学生在名单中将变为未分班。');"
+      >
+        <button type="submit" class="secondary sm" aria-label="删除班级 {{ c.name }}">删除</button>
+      </form>
     </li>
     {% endfor %}
   </ul>

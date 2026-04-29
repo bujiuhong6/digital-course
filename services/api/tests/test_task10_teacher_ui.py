@@ -26,6 +26,185 @@ def test_teacher_web_form_login_sets_cookie_on_redirect_response(client) -> None
     assert "章" in dash.text
 
 
+def test_teacher_username_login_and_reset_preserves_student_progress(client) -> None:
+    from app.services.chapter_json import sample_published_v1
+
+    first = client.get("/teacher/login", follow_redirects=True)
+    assert first.status_code == 200
+    assert "注册管理员账号" in first.text
+    assert "管理员账号" in first.text
+
+    boot = client.post(
+        "/teacher/bootstrap",
+        data={"username": "teacher-a", "password": "teacher-old-pw"},
+        follow_redirects=False,
+    )
+    assert boot.status_code == 303
+    client.cookies.clear()
+
+    bad_user = client.post(
+        "/teacher/do-login",
+        data={"username": "wrong-user", "password": "teacher-old-pw"},
+        follow_redirects=False,
+    )
+    assert bad_user.status_code == 200
+    assert "账号或密码错误" in bad_user.text
+
+    ok = client.post(
+        "/teacher/do-login",
+        data={"username": "teacher-a", "password": "teacher-old-pw"},
+        follow_redirects=False,
+    )
+    assert ok.status_code == 303
+
+    ch = client.post(
+        "/v1/admin/chapters",
+        json={"title": "重置保留章", "slug": "reset-keeps-progress"},
+    )
+    assert ch.status_code == 201, ch.text
+    cid = ch.json()["id"]
+    draft = sample_published_v1()
+    patch = client.patch(
+        f"/v1/admin/chapters/{cid}",
+        json={"aiGeneratedDraft": draft},
+    )
+    assert patch.status_code == 200, patch.text
+    pub = client.post(f"/v1/admin/chapters/{cid}/publish")
+    assert pub.status_code == 200, pub.text
+
+    client.post(
+        "/v1/admin/roster/import",
+        json={"rows": [{"studentNo": "RST001", "fullName": "重置学生"}]},
+    )
+    reg = client.post(
+        "/v1/student/register",
+        json={
+            "studentNo": "RST001",
+            "fullName": "重置学生",
+            "password": "student-pw-000",
+        },
+    )
+    assert reg.status_code == 201, reg.text
+    lr = client.post(
+        "/v1/student/login",
+        json={"studentNo": "RST001", "password": "student-pw-000"},
+    )
+    assert lr.status_code == 200
+    h = {"Authorization": f"Bearer {lr.json()['accessToken']}"}
+    for cell_id, stdout in (("c1", ""), ("c2", "Hello, world")):
+        vr = client.post(
+            "/v1/student/cells/verify",
+            json={
+                "chapterId": cid,
+                "cellId": cell_id,
+                "runOk": True,
+                "stdout": stdout,
+                "stderr": "",
+            },
+            headers=h,
+        )
+        assert vr.status_code == 200
+        assert vr.json().get("passed") is True
+    comp = client.post(f"/v1/student/chapters/{cid}/complete", headers=h)
+    assert comp.status_code == 200
+
+    client.cookies.clear()
+    reset_page = client.get("/teacher/login?reset=1", follow_redirects=True)
+    assert reset_page.status_code == 200
+    assert "重置管理员账号和密码" in reset_page.text
+    reset = client.post(
+        "/teacher/reset-admin",
+        data={"username": "teacher-b", "password": "teacher-new-pw"},
+        follow_redirects=False,
+    )
+    assert reset.status_code == 303
+    client.cookies.clear()
+
+    old_login = client.post(
+        "/teacher/do-login",
+        data={"username": "teacher-a", "password": "teacher-old-pw"},
+        follow_redirects=False,
+    )
+    assert old_login.status_code == 200
+    assert "账号或密码错误" in old_login.text
+
+    new_login = client.post(
+        "/teacher/do-login",
+        data={"username": "teacher-b", "password": "teacher-new-pw"},
+        follow_redirects=False,
+    )
+    assert new_login.status_code == 303
+    assert "teacher_session" in client.cookies
+
+    student_view = client.get(f"/v1/student/chapters/{cid}", headers=h)
+    assert student_view.status_code == 200
+    assert student_view.json()["chapter"].get("hasCompletedChapter") is True
+
+
+def test_teacher_brand_link_opens_login_page_even_when_logged_in(client) -> None:
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"username": "admin", "password": "brand-login-pw"},
+    )
+    login = client.post(
+        "/teacher/do-login",
+        data={"username": "admin", "password": "brand-login-pw"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+    dash = client.get("/teacher")
+    assert dash.status_code == 200
+    assert 'class="site-brand" href="/teacher/login?show=1"' in dash.text
+
+    visible_login = client.get("/teacher/login?show=1", follow_redirects=False)
+    assert visible_login.status_code == 200
+    assert "教师登录" in visible_login.text
+    assert "进入工作台" in visible_login.text
+    assert 'name="username" type="text" required autocomplete="username" value="admin"' not in visible_login.text
+
+    visible_reset = client.get("/teacher/login?reset=1", follow_redirects=False)
+    assert visible_reset.status_code == 200
+    assert "重置管理员账号和密码" in visible_reset.text
+
+
+def test_teacher_register_admin_account_can_replace_existing_login(client) -> None:
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"username": "admin", "password": "register-old-pw"},
+    )
+    page = client.get("/teacher/login?show=1", follow_redirects=False)
+    assert page.status_code == 200
+    assert "注册管理员账号" in page.text
+    assert "重置管理员账号和密码" in page.text
+
+    register_page = client.get("/teacher/login?register=1", follow_redirects=False)
+    assert register_page.status_code == 200
+    assert "注册管理员账号" in register_page.text
+
+    reg = client.post(
+        "/teacher/register-admin",
+        data={"username": "registered-admin", "password": "register-new-pw"},
+        follow_redirects=False,
+    )
+    assert reg.status_code == 303
+    client.cookies.clear()
+
+    old_login = client.post(
+        "/teacher/do-login",
+        data={"username": "admin", "password": "register-old-pw"},
+        follow_redirects=False,
+    )
+    assert old_login.status_code == 200
+    assert "账号或密码错误" in old_login.text
+
+    new_login = client.post(
+        "/teacher/do-login",
+        data={"username": "registered-admin", "password": "register-new-pw"},
+        follow_redirects=False,
+    )
+    assert new_login.status_code == 303
+
+
 def test_teacher_delete_chapter_from_dashboard_post(client) -> None:
     client.post(
         "/v1/admin/bootstrap",
@@ -285,6 +464,18 @@ def test_merge_raw_reference_answers_fills_stale_published() -> None:
     assert m is not None
     assert m["blocks"][0]["extensionCell"].get("referenceAnswer") == "print(1)\n"
     assert preview["blocks"][0]["extensionCell"].get("referenceAnswer") is None
+
+
+def test_teacher_exercise_title_uses_simple_student_numbering() -> None:
+    from app.routers.teacher_ui import (
+        _teacher_exercise_number_label,
+        _teacher_exercise_title_without_leading_label,
+    )
+
+    assert _teacher_exercise_number_label(30) == "第30题"
+    assert _teacher_exercise_title_without_leading_label("第 1 题（基础）", "第1题") == ""
+    assert _teacher_exercise_title_without_leading_label("第30题：绘制柱状图", "第30题") == "绘制柱状图"
+    assert _teacher_exercise_title_without_leading_label("综合扩展-30", "第30题") == "综合扩展-30"
 
 
 def test_merge_raw_reference_answers_matches_by_block_id_not_index() -> None:

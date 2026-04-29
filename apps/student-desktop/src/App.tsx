@@ -1,4 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiJson, clearToken, getToken, setToken } from "./api";
 import { ChapterPractice } from "./ChapterPractice";
 import { hasMeaningfulCodeDraft } from "./chapterDraftStorage";
@@ -25,6 +38,26 @@ function practiceStatusLabel(s: PracticeStatus): string {
     return "练习中";
   }
   return "待完成";
+}
+
+function practiceStatusTone(s: PracticeStatus): "default" | "secondary" | "outline" {
+  if (s === "submitted") {
+    return "default";
+  }
+  if (s === "inProgress") {
+    return "secondary";
+  }
+  return "outline";
+}
+
+function practiceActionLabel(s: PracticeStatus): string {
+  if (s === "submitted") {
+    return "查看结果";
+  }
+  if (s === "inProgress") {
+    return "继续练习";
+  }
+  return "去学习";
 }
 
 function mergePracticeStatusForList(
@@ -84,6 +117,10 @@ function App() {
       setChapters(data.chapters);
       setScreen("chapters");
     } catch (e) {
+      if (String(e).toLowerCase().includes("unauthorized")) {
+        clearToken();
+        setCurrentStudentId(null);
+      }
       setErr(String(e));
     } finally {
       setLoading(false);
@@ -183,178 +220,217 @@ function App() {
     }
   }
 
+  function switchAuthTab(next: "login" | "register") {
+    setAuthTab(next);
+    setErr(null);
+    setOkHint(null);
+  }
+
+  function backToChapters() {
+    setSelected(null);
+    setScreen("chapters");
+    void goChapters();
+  }
+
+  const rootClassName = [
+    "sd-root",
+    screen === "auth" ? "sd-auth-screen" : "",
+    screen === "chapter" ? "sd-wide" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <main className={`sd-root${screen === "chapter" ? " sd-wide" : ""}`}>
+    <main className={rootClassName}>
       <header className="sd-header">
-        <h1>章节练习（学生用）</h1>
-        {getToken() && (
-          <button type="button" className="sd-btn-ghost" onClick={onLogout}>
+        <div className="sd-header-copy">
+          <p className="sd-eyebrow">《数字技术与应用》课程</p>
+          <h1>AI智能编程学习平台</h1>
+          <p>跟着AI助教，一步一步学会python编程</p>
+        </div>
+        {screen !== "auth" && getToken() && (
+          <Button type="button" variant="outline" onClick={onLogout}>
             退出
-          </button>
+          </Button>
         )}
       </header>
 
-      {okHint && <div className="sd-okhint">{okHint}</div>}
-      {err && <div className="sd-error">{err}</div>}
-
-      {screen === "auth" && (
-        <div className="sd-card sd-auth">
-          <div className="sd-tabs">
-            <button
-              type="button"
-              className={authTab === "login" ? "sd-tab on" : "sd-tab"}
-              onClick={() => {
-                setAuthTab("login");
-                setErr(null);
-                setOkHint(null);
-              }}
-            >
-              登录
-            </button>
-            <button
-              type="button"
-              className={authTab === "register" ? "sd-tab on" : "sd-tab"}
-              onClick={() => {
-                setAuthTab("register");
-                setErr(null);
-                setOkHint(null);
-              }}
-            >
-              注册
-            </button>
-          </div>
-          {authTab === "login" ? (
-            <form onSubmit={onLogin}>
-              <h2>登录</h2>
-              <p className="sd-muted sm">
-                学号、姓名需已由教师在名单导入，且与注册时一致。
-              </p>
-              <label>
-                学号
-                <input
-                  value={studentNo}
-                  onChange={(e) => setStudentNo(e.target.value)}
-                  autoComplete="username"
-                />
-              </label>
-              <label>
-                密码
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </label>
-              <button type="submit" disabled={loading}>
-                {loading ? "…" : "进入"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={onRegister}>
-              <h2>注册</h2>
-              <p className="sd-muted sm">
-                学号、姓名须与教师导入名单一字不差（含空格）。注册成功后切到「登录」。
-              </p>
-              <label>
-                学号
-                <input
-                  value={studentNo}
-                  onChange={(e) => setStudentNo(e.target.value)}
-                  autoComplete="username"
-                />
-              </label>
-              <label>
-                姓名
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  autoComplete="name"
-                />
-              </label>
-              <label>
-                设置密码
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              <label>
-                确认密码
-                <input
-                  type="password"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </label>
-              <button type="submit" disabled={loading}>
-                {loading ? "…" : "注册"}
-              </button>
-            </form>
-          )}
-        </div>
+      {okHint && (
+        <Alert className="sd-alert sd-alert-ok">
+          <AlertDescription>{okHint}</AlertDescription>
+        </Alert>
+      )}
+      {err && (
+        <Alert className="sd-alert" variant="destructive">
+          <AlertDescription>{err}</AlertDescription>
+        </Alert>
       )}
 
-      {screen === "chapters" && (
-        <section className="sd-card">
-          <h2>已发布章节练习</h2>
-          {chapters.length === 0 ? (
-            <p>暂无。请教师端发布章后再试。</p>
-          ) : (
-            <ul className="sd-list">
-              {chapters.map((c) => (
-                <li key={c.chapterId} className="sd-list-row">
-                  <div className="sd-list-main">
-                    <button
-                      type="button"
-                      className="sd-link"
-                      onClick={() => void openChapter(c.chapterId)}
-                    >
-                      {c.title}
-                    </button>
-                  </div>
-                  <span
-                    className="sd-list-status"
-                    title="本章练习进度"
-                    aria-label={`本章练习状态：${practiceStatusLabel(
-                      mergePracticeStatusForList(
-                        c.practiceStatus,
-                        c.chapterId,
-                        currentStudentId,
-                      ),
-                    )}`}
-                  >
-                    {practiceStatusLabel(
-                      mergePracticeStatusForList(
-                        c.practiceStatus,
-                        c.chapterId,
-                        currentStudentId,
-                      ),
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+      {screen === "auth" && (
+        <section className="sd-auth-layout">
+          <Card className="sd-card sd-auth" size="default">
+            <CardHeader>
+              <CardTitle>学生入口</CardTitle>
+              <CardDescription>使用老师名单中的学号登录。</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs
+                value={authTab}
+                onValueChange={(value) =>
+                  switchAuthTab(value === "register" ? "register" : "login")
+                }
+              >
+                <TabsList className="sd-auth-tabs">
+                  <TabsTrigger value="login">登录</TabsTrigger>
+                  <TabsTrigger value="register">注册</TabsTrigger>
+                </TabsList>
+                <TabsContent value="login">
+                  <form className="sd-form" onSubmit={onLogin}>
+                    <div className="sd-form-copy">
+                      <h2>欢迎回来</h2>
+                      <p>使用你的学号和密码登录</p>
+                    </div>
+                    <label>
+                      学号
+                      <Input
+                        value={studentNo}
+                        onChange={(e) => setStudentNo(e.target.value)}
+                        autoComplete="username"
+                      />
+                    </label>
+                    <label>
+                      密码
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </label>
+                    <div className="sd-form-actions">
+                      <Button type="submit" disabled={loading}>
+                        {loading ? "进入中…" : "进入练习"}
+                      </Button>
+                    </div>
+                  </form>
+                </TabsContent>
+                <TabsContent value="register">
+                  <form className="sd-form" onSubmit={onRegister}>
+                    <div className="sd-form-copy">
+                      <h2>首次使用</h2>
+                      <p>使用金陵科技学院教务系统里的学号和姓名来注册，密码自行设定，并妥善保管</p>
+                    </div>
+                    <label>
+                      学号
+                      <Input
+                        value={studentNo}
+                        onChange={(e) => setStudentNo(e.target.value)}
+                        autoComplete="username"
+                      />
+                    </label>
+                    <label>
+                      姓名
+                      <Input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        autoComplete="name"
+                      />
+                    </label>
+                    <label>
+                      设置密码
+                      <Input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </label>
+                    <label>
+                      确认密码
+                      <Input
+                        type="password"
+                        value={password2}
+                        onChange={(e) => setPassword2(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </label>
+                    <div className="sd-form-actions">
+                      <Button type="submit" disabled={loading}>
+                        {loading ? "注册中…" : "创建账号"}
+                      </Button>
+                    </div>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </section>
       )}
 
+      {screen === "chapters" && (
+        <Card className="sd-card sd-chapters-card">
+          <CardHeader>
+            <CardTitle>已发布章节练习</CardTitle>
+            <CardDescription>选择一章开始练习，系统会显示你的进度。</CardDescription>
+          </CardHeader>
+          <CardContent>
+          {chapters.length === 0 ? (
+            <div className="sd-empty">
+              <p>还没有开放的章节。</p>
+              <span>等老师发布后，这里会出现章节列表。</span>
+            </div>
+          ) : (
+            <ul className="sd-list">
+              {chapters.map((c) => {
+                const mergedStatus = mergePracticeStatusForList(
+                  c.practiceStatus,
+                  c.chapterId,
+                  currentStudentId,
+                );
+                return (
+                <li key={c.chapterId}>
+                  <Card className="sd-chapter-item" size="sm">
+                    <CardHeader>
+                  <div className="sd-list-main">
+                    <CardTitle className="group-data-[size=sm]/card:text-xl group-data-[size=sm]/card:font-semibold">
+                      {c.title}
+                    </CardTitle>
+                  </div>
+                      <CardAction className="sd-list-action">
+                        <Badge
+                          variant={practiceStatusTone(mergedStatus)}
+                          title="本章练习进度"
+                          aria-label={`本章练习状态：${practiceStatusLabel(mergedStatus)}`}
+                        >
+                          {practiceStatusLabel(mergedStatus)}
+                        </Badge>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void openChapter(c.chapterId)}
+                        >
+                          {practiceActionLabel(mergedStatus)}
+                        </Button>
+                      </CardAction>
+                    </CardHeader>
+                  </Card>
+                </li>
+                );
+              })}
+            </ul>
+          )}
+          </CardContent>
+        </Card>
+      )}
+
       {screen === "chapter" && selected && (
-        <section className="sd-card sd-chapter-wrap">
-          <button
-            type="button"
-            className="sd-btn-ghost"
-            onClick={() => {
-              setSelected(null);
-              setScreen("chapters");
-              void goChapters();
-            }}
-          >
-            ← 返回列表
-          </button>
+        <section className="sd-chapter-wrap">
+          <div className="sd-chapter-topbar">
+            <Button type="button" variant="outline" onClick={backToChapters}>
+              返回列表
+            </Button>
+            <span>练习会自动保留本地草稿。</span>
+          </div>
           {selected.publishedContent && currentStudentId ? (
             <ChapterPractice
               studentId={currentStudentId}
@@ -363,11 +439,7 @@ function App() {
               publishedContent={selected.publishedContent}
               initialChapterCompleted={!!selected.hasCompletedChapter}
               initialCellsPassed={selected.cellsPassed ?? []}
-              onBackToList={() => {
-                setSelected(null);
-                setScreen("chapters");
-                void goChapters();
-              }}
+              onBackToList={backToChapters}
             />
           ) : selected.publishedContent ? (
             <p className="sd-muted">正在加载学生信息…</p>

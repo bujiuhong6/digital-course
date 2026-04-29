@@ -175,21 +175,44 @@ function guideTextareaRowsForBackdrop(g: GuideCell): number {
   return Math.min(30, Math.max(8, labelLines + codeLines + 4));
 }
 
-function exerciseNumberLabel(title: string | null | undefined, fallback: string): string {
+function exerciseNumberLabel(index: number): string {
+  return `第${index}题`;
+}
+
+function exerciseTitleWithoutLeadingLabel(
+  title: string | null | undefined,
+  label: string,
+): string {
   const t = (title ?? "").trim();
-  const patterns = [
-    /综合扩展[-－—]?\d+/,
-    /\d+(?:\.\d+)*[-－—]?题\s*\d+/,
-    /扩展[-－—]?\d+/,
-    /题\s*\d+/,
-  ];
-  for (const pattern of patterns) {
-    const match = t.match(pattern);
-    if (match?.[0]) {
-      return match[0].replace(/\s+/g, "");
+  if (!t) {
+    return "";
+  }
+  const normalizedTitle = t.replace(/\s+/g, "");
+  const normalizedLabel = label.replace(/\s+/g, "");
+  if (normalizedTitle === normalizedLabel) {
+    return "";
+  }
+  if (!normalizedTitle.startsWith(normalizedLabel)) {
+    return t;
+  }
+  const labelChars = normalizedLabel.length;
+  let seen = 0;
+  let cut = 0;
+  for (const ch of t) {
+    cut += ch.length;
+    if (/\s/.test(ch)) {
+      continue;
+    }
+    seen += 1;
+    if (seen >= labelChars) {
+      break;
     }
   }
-  return fallback;
+  return t
+    .slice(cut)
+    .replace(/^[\s:：、\-－—]+/, "")
+    .replace(/^[(（]\s*(基础|扩展)\s*[)）]\s*/, "")
+    .trim();
 }
 
 function isPublishedV1(x: unknown): x is PublishedV1 {
@@ -725,25 +748,22 @@ function ChapterPracticeInner({
     data.blocks.forEach((b, blockIndex) => {
       const cells: Array<{
         id: string;
-        title: string | null | undefined;
-        fallback: string;
+        label: string;
       }> = [
         {
           id: b.guideCell.id,
-          title: b.guideCell.exerciseTitle,
-          fallback: `第${blockIndex * 2 + 1}题`,
+          label: exerciseNumberLabel(blockIndex * 2 + 1),
         },
         {
           id: b.extensionCell.id,
-          title: b.extensionCell.exerciseTitle,
-          fallback: `第${blockIndex * 2 + 2}题`,
+          label: exerciseNumberLabel(blockIndex * 2 + 2),
         },
       ];
       for (const cell of cells) {
         const s = cellState[cell.id];
         const passed = s ? s.passed === true : initialPassedSet.has(cell.id);
         if (!passed) {
-          labels.push(exerciseNumberLabel(cell.title, cell.fallback));
+          labels.push(cell.label);
         }
       }
     });
@@ -1165,12 +1185,20 @@ function ChapterPracticeInner({
           : null}
         {data.blocks.map((b, bi) => {
           const sec = b.sectionTitle?.trim() || `知识点 ${bi + 1}`;
-          const gTitle =
-            b.guideCell.exerciseTitle?.trim() || "第 1 题（基础）";
-          const eTitle =
-            b.extensionCell.exerciseTitle?.trim() || "第 1 题（扩展）";
           const gCell = b.guideCell;
           const eCell = b.extensionCell;
+          const guideLabel = exerciseNumberLabel(bi * 2 + 1);
+          const extensionLabel = exerciseNumberLabel(bi * 2 + 2);
+          const gTitle =
+            exerciseTitleWithoutLeadingLabel(
+              gCell.exerciseTitle,
+              guideLabel,
+            ) || "基础练习";
+          const eTitle =
+            exerciseTitleWithoutLeadingLabel(
+              eCell.exerciseTitle,
+              extensionLabel,
+            ) || "扩展练习";
           const guideState = cellState[gCell.id];
           const extensionState = cellState[eCell.id];
           const guideFeedback = effectiveFeedback(guideState);
@@ -1209,7 +1237,10 @@ function ChapterPracticeInner({
                 : null}
 
               <h3 className="jnb-h3">基础练习</h3>
-              <h4 className="jnb-h4">{gTitle}</h4>
+              <h4 className="jnb-h4 jnb-exercise-title">
+                <span className="jnb-exercise-no">{guideLabel}</span>
+                <span>{gTitle}</span>
+              </h4>
               {htmlMd(b.guideCell.description, `${b.id}-gdesc`)}
               {b.guideCell.expectedOutput || b.guideCell.expectedImageDataUrl ? (
                 <div className="jnb-expected">
@@ -1316,7 +1347,10 @@ function ChapterPracticeInner({
               />
 
               <h3 className="jnb-h3 jnb-h3--ext">扩展练习</h3>
-              <h4 className="jnb-h4">{eTitle}</h4>
+              <h4 className="jnb-h4 jnb-exercise-title">
+                <span className="jnb-exercise-no">{extensionLabel}</span>
+                <span>{eTitle}</span>
+              </h4>
               {htmlMd(b.extensionCell.promptHtml || "<p></p>", `${b.id}-exq`)}
               {b.extensionCell.expectedOutput ||
               b.extensionCell.expectedImageDataUrl ? (

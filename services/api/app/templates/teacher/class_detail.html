@@ -1,94 +1,90 @@
 {% extends "teacher/base.html" %}
 {% block title %}{{ cl.name }}{% endblock %}
-{% block head %}
-<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
-{% endblock %}
 {% block body %}
 {% if roster_flash %}
 <p class="{% if roster_flash_level == 'ok' %}flash-ok{% else %}flash-err{% endif %}" role="status">
   {% if roster_flash_level == 'ok' %}✓{% else %}✗{% endif %} {{ roster_flash }}
 </p>
 {% endif %}
-<div class="bar">
-  <h1>{{ cl.name }} <code style="color:var(--muted);font-size:0.85rem;font-weight:400">{{ cl.id }}</code></h1>
-  <div class="bar-actions">
-    <a class="btn secondary" href="/teacher/classes">返回班级</a>
-    <a class="btn secondary" href="/teacher">概览</a>
+
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">{{ cl.name }}</h1>
   </div>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">批量导出本班练习完成情况</h2>
-  <p style="color:var(--muted);font-size:0.9rem">已发布章全部汇总：每个学生每章有「标记完成」则一行，含学号、姓名、完成时间（UTC）。</p>
-  <p>
+  <div class="section-header">
+    <h2>批量导出本班练习完成情况</h2>
+  </div>
+  <p class="muted" style="font-size:0.9rem;line-height:1.5">已发布章全部汇总：每个学生每章有「标记完成」则一行，含学号、姓名、完成时间（UTC）。</p>
+  <div class="form-actions mt-0" style="justify-content:flex-start">
     <a class="btn secondary" href="/teacher/classes/{{ cl.id }}/completions-export">导出 CSV</a>
-  </p>
+  </div>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">当前名单行（本班导入）</h2>
+  <div class="section-header">
+    <h2>当前名单行（本班导入）</h2>
+  </div>
   {% if not roster_rows %}
   <p>本班在名单中暂无记录。可在「<a href="/teacher/roster">名单</a>」导入时填写班级列，或将学生分入本班。</p>
   {% else %}
+  <div class="bulk-toolbar" role="group" aria-label="本班导入名单批量操作">
+    <button type="submit" class="secondary sm" form="class-imported-roster-remove-form" onclick="return confirm('确定将所选名单行移出本班？这些行会在「学生名单」页列为未分班，并从此表消失。');">移出班级</button>
+    <button type="button" class="secondary sm" onclick="var t=document.querySelectorAll('#class-imported-roster-tbody input.js-class-roster-cb');for(var i=0;i&lt;t.length;i++)t[i].checked=true">全选</button>
+    <button type="button" class="secondary sm" onclick="var t=document.querySelectorAll('#class-imported-roster-tbody input.js-class-roster-cb');for(var i=0;i&lt;t.length;i++)t[i].checked=false">取消全选</button>
+  </div>
+  <form id="class-imported-roster-remove-form" method="post" action="/teacher/classes/{{ cl.id }}/roster-entries/remove-from-class"></form>
   <table>
-    <thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>状态</th></tr></thead>
-    <tbody>
+    <thead>
+      <tr>
+        <th scope="col" style="width:2.5rem">
+          <span class="visually-hidden">选择</span>
+          <input type="checkbox" id="class-roster-select-all" title="全选" aria-label="全选本表"/>
+        </th>
+        <th scope="col">学号</th>
+        <th scope="col">姓名</th>
+        <th scope="col">班级</th>
+        <th scope="col">状态</th>
+      </tr>
+    </thead>
+    <tbody id="class-imported-roster-tbody">
       {% for r in roster_rows %}
       <tr>
+        <td>
+          <input
+            class="js-class-roster-cb"
+            type="checkbox"
+            name="entry_id"
+            value="{{ r.id }}"
+            form="class-imported-roster-remove-form"
+            aria-label="选择 {{ r.student_no }}"
+          />
+        </td>
         <td>{{ r.student_no }}</td>
         <td>{{ r.full_name }}</td>
-        <td>{% if r.class_ %}{{ r.class_.name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if r.class_ %}{{ r.class_.name }}{% else %}<span class="muted">未分班</span>{% endif %}</td>
         <td>{% if r.status == "bound" %}已注册{% else %}未注册{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% endif %}
-</div>
-
-<div class="card">
-  <h2 style="margin-top:0">已注册学生与班级</h2>
-  <p style="color:var(--muted);font-size:0.9rem">与名单页表结构一致。调整班级会返回本页，名单页同步。</p>
-  {% if not reg_students %}
-  <p>尚无已注册且分入本班的学生。</p>
-  {% else %}
-  <table>
-    <thead>
-      <tr>
-        <th>学号</th>
-        <th>姓名</th>
-        <th>班级</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for st, cls in reg_students %}
-      <tr>
-        <td><code>{{ st.student_no }}</code></td>
-        <td>{{ st.full_name }}</td>
-        <td>{% if cls %}{{ cls.name }}{% else %}<span class="muted">未分班</span>{% endif %}</td>
-        <td>
-          <form method="post" action="/teacher/students/{{ st.id }}/set-class" style="display:inline-flex;gap:0.35rem;align-items:center;margin:0;flex-wrap:wrap">
-            <input type="hidden" name="return_to" value="class" />
-            <input type="hidden" name="return_class_id" value="{{ cl.id }}" />
-            <label for="c-{{ st.id }}" style="font-size:0.85rem;color:var(--muted)">设班</label>
-            <select id="c-{{ st.id }}" name="class_id" style="max-width:12rem">
-              <option value="" {% if not st.class_id %}selected{% endif %}>未分班</option>
-              {% for c in all_classes %}
-              <option value="{{ c.id }}" {% if st.class_id and st.class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">保存</button>
-          </form>
-          <form method="post" action="/teacher/students/{{ st.id }}/remove-from-class" style="display:inline-block;margin:0.35rem 0 0 0" onsubmit="return confirm('确定将该学生移出本班？学生将回到「名单」页的未分班名单。');">
-            <input type="hidden" name="from_class_id" value="{{ cl.id }}" />
-            <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">移除班级</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <script>
+  (function () {
+    var hdr = document.getElementById("class-roster-select-all");
+    var bodyEl = document.getElementById("class-imported-roster-tbody");
+    if (!hdr || !bodyEl) return;
+    function lineBoxes() {
+      return bodyEl.querySelectorAll("input.js-class-roster-cb");
+    }
+    hdr.addEventListener("change", function () {
+      var checked = hdr.checked;
+      var boxes = lineBoxes();
+      for (var i = 0; i < boxes.length; i++) boxes[i].checked = checked;
+    });
+  })();
+  </script>
   {% endif %}
 </div>
 {% endblock %}

@@ -25,6 +25,12 @@ class AdminConfig(Base):
     __tablename__ = "admin_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    username: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        default="admin",
+        server_default=text("'admin'"),
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

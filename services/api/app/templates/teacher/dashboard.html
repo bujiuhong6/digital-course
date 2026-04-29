@@ -2,11 +2,9 @@
 {% from "teacher/macros.html" import content_status_zh %}
 {% block title %}章节练习内容设计{% endblock %}
 {% block body %}
-<div class="bar">
-  <h1>章节练习内容设计</h1>
-  <div class="bar-actions">
-    <a class="btn secondary" href="/teacher/roster">名单</a>
-    <a class="btn secondary" href="/teacher/classes">班级{% if class_count is defined and class_count %}（{{ class_count }}）{% endif %}</a>
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">章节练习内容设计</h1>
   </div>
 </div>
 
@@ -15,21 +13,33 @@
 {% endif %}
 
 <div class="card">
-  <h2 style="margin-top:0">新建章节练习</h2>
+  <div class="section-header">
+    <h2>新建章节练习</h2>
+  </div>
   <form method="post" action="/teacher/chapters/new">
     <label for="t">标题</label>
     <input id="t" name="title" type="text" value="新章节" required/>
-    <p><button type="submit">创建</button></p>
+    <div class="form-actions">
+      <button type="submit">创建</button>
+    </div>
   </form>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">章节练习列表</h2>
+  <div class="section-header">
+    <h2>章节练习列表</h2>
+  </div>
   {% if not chapters %}
   <p>暂无。请先新建。</p>
   {% else %}
-  <table>
-    <thead><tr><th>标题</th><th>状态</th><th></th></tr></thead>
+  <table class="chapter-dashboard-table">
+    <thead>
+      <tr>
+        <th scope="col">标题</th>
+        <th scope="col">状态</th>
+        <th scope="col" class="actions-head">操作</th>
+      </tr>
+    </thead>
     <tbody>
       {% for c in chapters %}
       <tr>
@@ -40,14 +50,16 @@
             data-current-title="{{ c.title | e }}">✎</button>
         </td>
         <td>{{ content_status_zh(c.content_status) }}</td>
-        <td class="row-actions">
+        <td class="actions-cell">
           <a href="/teacher/chapters/{{ c.id }}/edit">编辑</a>
           {% if c.content_status == 'published' %}
-          <a href="/teacher/chapters/{{ c.id }}/completions" class="muted" style="margin-left:0.35rem">完成记录</a>
+          <span class="muted">&nbsp;·&nbsp;</span>
+          <a href="/teacher/chapters/{{ c.id }}/completions" class="muted">完成记录</a>
           {% else %}
-          <span class="muted">· {{ content_status_zh(c.content_status) }}</span>
+          <span class="muted">&nbsp;·&nbsp;</span>
+          <span class="muted">{{ content_status_zh(c.content_status) }}</span>
           {% endif %}
-          <form method="post" action="/teacher/chapters/{{ c.id }}/delete" style="display:inline;margin:0" onsubmit="return confirm('确定删除此章？学生端将不可见；与章相关的练习记录会一并删除。');">
+          <form method="post" action="/teacher/chapters/{{ c.id }}/delete" style="display:inline;margin-inline-start:0.35rem;" onsubmit="return confirm('确定删除此章？学生端将不可见；与章相关的练习记录会一并删除。');">
             <button type="submit" class="link-danger" title="删除章">删除</button>
           </form>
         </td>

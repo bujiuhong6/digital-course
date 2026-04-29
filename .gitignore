@@ -4,8 +4,19 @@
 .env.*.local
 *.pem
 
-# Local agent screenshots (not part of the repo)
+# baoyu skills local API keys
+.baoyu-skills/
+
+# Local agents, browser automation, and screenshots
 artifacts/
-.playwright-runner/node_modules/
+.playwright-runner/
 opt/cursor/artifacts/
 teacher-login-demo.png
+*.png.tmp
+
+# Local databases and caches
+data/
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store

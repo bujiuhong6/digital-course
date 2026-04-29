@@ -1,14 +1,130 @@
 # digital-course
 
-单人维护的教学产品规格与开发仓库（**无协作者**；密钥与本地配置不提交到 Git）。
+《数字技术与应用》AI 智能编程教学平台。仓库包含教师端 FastAPI 页面、学生端 Tauri/React 桌面应用、Pyodide 代码执行、章节练习发布、学生进度记录和 OpenAI 兼容大语言模型接入。
 
-## 使用本仓库
+本仓库提交的是代码、迁移、静态资源和章节 seed。运行时数据库、管理员账号、学生名单、答题记录、本地 `.env` 与 API Key 均不提交。
 
-- **Context7 MCP**：根目录需有 **`.env`**，内含从 [Context7](https://context7.com/dashboard) 取得并填入的 `CONTEXT7_API_KEY=...`。复制 **`.env.example`** 为 **`.env`** 后填值。MCP 配置在 **`.cursor/mcp.json`**。  
-- **若打开 `mcp.json` 出现 ENOPRO / 未找到 `vscode-remote://backgroundcomposer+.../mcp.json` 的文件系统提供程序**：该 URI 来自**已失效的云端（Background Composer）会话**。在侧栏**从当前工作区**打开 **`.cursor/mcp.json`**，或在 **设置 → Cursor → MCP** 中编辑。编辑本地/工作区里的真实文件路径即可，Context7 与项目根 **`.env`** 中的 `CONTEXT7_API_KEY` 配套使用。
-- **Superpowers 技能正文**：`vendor/superpowers` 为子模块。若目录为空，执行 `git submodule update --init --recursive`。
-- **准备清单**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-preparation.md)  
-- **设计规格**：[`docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md`](docs/superpowers/specs/2026-04-23-ai-python-teaching-system-design.md)  
-- **实现计划**（`writing-plans`）：[`docs/superpowers/plans/2026-04-23-ai-python-teaching-system-implementation.md`](docs/superpowers/plans/2026-04-23-ai-python-teaching-system-implementation.md) — 与清单、设计一致。  
-- **API 服务**：`services/api/`。更完整的本地命令、**OpenRouter 等 LLM 环境变量**见 [`services/api/README.md`](services/api/README.md)。生产镜像见 `services/api/Dockerfile` 与根目录 `docker-compose.yml`。
-- **学生桌面（任务 11）**：`apps/student-desktop/`（Tauri + React + Vite，环境变量 `VITE_API_BASE_URL`）。说明见该目录下 `README.md`。
+## 目录
+
+- `services/api/`：FastAPI 后端、教师端 HTML、学生 REST、聊天代理、数据库迁移。
+- `apps/student-desktop/`：学生端 Tauri + React + Vite 应用。
+- `services/api/seeds/chapters.json`：已发布章节练习 seed。保留课程题目，不包含学生、名单、班级、管理员和答题记录。
+- `scripts/initialize_content_db.py`：用 seed 初始化数据库，并清空运行时数据。
+- `docs/superpowers/`：产品规格、实现计划和开发过程文档。
+
+## 初始化 API
+
+```bash
+cd services/api
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+python -m alembic upgrade head
+cd ../..
+services/api/.venv/bin/python scripts/initialize_content_db.py --prune-extra-chapters
+```
+
+初始化后数据库只保留章节练习内容。教师端首次进入会提示设置管理员账号和密码；学生名单、班级、学生账号和答题记录为空。
+
+启动 API：
+
+```bash
+cd services/api
+./.venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+教师端入口：`http://127.0.0.1:8000/teacher/login`
+
+## 启动学生端
+
+浏览器调试：
+
+```bash
+cd apps/student-desktop
+pnpm install
+pnpm dev
+```
+
+终端会输出本地地址，通常是 `http://localhost:1420`。
+
+桌面 App：
+
+```bash
+cd apps/student-desktop
+pnpm tauri dev
+```
+
+学生端开发默认通过 Vite 代理访问 API：`/v1` → `http://127.0.0.1:8000`。API 需要先启动。
+
+## 接入大语言模型
+
+后端使用 OpenAI 兼容 Chat Completions。复制 `services/api/.env.example` 为 `services/api/.env` 后填写本地密钥。`.env` 已被忽略，不会上传 GitHub。
+
+DeepSeek 示例：
+
+```env
+CHAPTER_GEN_MOCK=0
+LLM_BASE_URL=https://api.deepseek.com
+LLM_API_KEY=你的 DeepSeek API Key
+CHAPTER_GEN_MODEL=deepseek-v4-flash
+
+CHAT_LLM_BASE_URL=https://api.deepseek.com
+CHAT_LLM_API_KEY=你的 DeepSeek API Key
+CHAT_MODEL=deepseek-v4-flash
+```
+
+OpenRouter 示例：
+
+```env
+CHAPTER_GEN_MOCK=0
+LLM_BASE_URL=https://openrouter.ai/api
+LLM_API_KEY=你的 OpenRouter API Key
+CHAPTER_GEN_MODEL=openai/gpt-4o-mini
+CHAT_MODEL=openai/gpt-4o-mini
+OPENROUTER_HTTP_REFERER=http://127.0.0.1:8000
+OPENROUTER_TITLE=digital-course
+```
+
+硅基流动示例：
+
+```env
+CHAPTER_GEN_MOCK=0
+LLM_BASE_URL=https://api.siliconflow.cn
+LLM_API_KEY=你的硅基流动 API Key
+CHAPTER_GEN_MODEL=deepseek-ai/DeepSeek-V4-Flash
+CHAT_MODEL=deepseek-ai/DeepSeek-V4-Flash
+```
+
+`CHAT_LLM_BASE_URL` / `CHAT_LLM_API_KEY` 可单独配置学生 AI 助手；未设置时回退到 `LLM_BASE_URL` / `LLM_API_KEY`。
+
+## 测试
+
+后端：
+
+```bash
+cd services/api
+pytest -q
+ruff check app tests
+```
+
+学生端：
+
+```bash
+cd apps/student-desktop
+pnpm typecheck
+pnpm build
+```
+
+## 注意事项
+
+- 不提交 `services/api/.env`、`apps/student-desktop/.env`、SQLite 数据库、虚拟环境、缓存和本地截图。
+- 推送前可用 `git status --short` 和敏感词扫描确认没有 API Key。
+- `services/api/seeds/chapters.json` 是课程内容来源。运行 `scripts/initialize_content_db.py` 会保留这些章节并清空运行时数据。
+- Context7 MCP 本地使用时可复制根目录 `.env.example` 为 `.env`，填写 `CONTEXT7_API_KEY`。MCP 配置在 `.cursor/mcp.json`。

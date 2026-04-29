@@ -13,7 +13,11 @@ from test_task8_student_chapters import _published_chapter_id, _student_token
 
 
 @pytest.fixture(autouse=True)
-def clear_chat_rate_limiter() -> object:
+def isolate_chat_test_settings(monkeypatch: pytest.MonkeyPatch) -> object:
+    monkeypatch.setattr(config.settings, "llm_base_url", "")
+    monkeypatch.setattr(config.settings, "llm_api_key", "")
+    monkeypatch.setattr(config.settings, "chat_llm_base_url", "")
+    monkeypatch.setattr(config.settings, "chat_llm_api_key", "")
     _state.clear()
     yield
     _state.clear()

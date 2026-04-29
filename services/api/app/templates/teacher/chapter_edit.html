@@ -71,14 +71,61 @@
       height: auto;
     }
   }
-  .draft-actions {
+  .publish-toolbar {
     display: flex;
-    gap: 0.75rem;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-start;
+    gap: 0.5rem;
     margin: 0 0 1rem 0;
   }
+  .publish-toolbar #fdraft .form-actions {
+    margin-top: 0 !important;
+    justify-content: flex-start !important;
+    gap: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .publish-toolbar .form-actions button[type="submit"],
+  .publish-toolbar form.unpublish-form button[type="submit"] {
+    box-sizing: border-box;
+    width: 7rem;
+    min-width: 7rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    line-height: 1.2;
+  }
+  a.chapter-toolbar-back {
+    box-sizing: border-box;
+    width: 9.25rem;
+    min-width: 9.25rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .publish-toolbar a.chapter-toolbar-back {
+    margin-inline-start: auto;
+  }
+  .chapter-edit-back-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-bottom: 0.35rem;
+  }
+  .publish-toolbar form.unpublish-form { margin: 0; }
+  .publish-toolbar form.unpublish-form button { margin: 0; }
   .draft-footer-note { color: var(--muted); font-size: 0.85rem; margin: 0.75rem 0 0; }
   .copy-template-btn { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
   .copy-template-btn.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
@@ -90,11 +137,17 @@
   .btn-icon.chapter-title-edit-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 1.5rem; height: 1.5rem; padding: 0; flex-shrink: 0;
-    background: transparent; border: 1px solid #334155; border-radius: 4px; color: var(--muted);
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    color: #64748b;
     cursor: pointer; line-height: 1;
   }
   .btn-icon.chapter-title-edit-btn:hover, .btn-icon.chapter-title-edit-btn:focus-visible {
-    color: var(--accent); border-color: var(--accent); outline: none;
+    background: #e8eef5;
+    color: var(--accent);
+    border-color: #cbd5e1;
+    outline: none;
   }
   .bar-title-row .chapter-title-rename-input {
     width: auto; min-width: 8rem; max-width: min(32rem, 100%);
@@ -103,18 +156,14 @@
   .bar-title-row.chapter-title-row-editing .chapter-title-view { display: none; }
   .bar-title-row.chapter-title-row-editing .chapter-title-rename-input { display: block; }
   .bar-title-row:not(.chapter-title-row-editing) .chapter-title-rename-input { display: none; }
-  .chapter-edit-bottom-nav {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid #2d3a4d;
-  }
 </style>
 {% endblock %}
 {% block body %}
-<div class="bar">
+<div class="page-heading">
+  <div class="page-title-group" style="width:100%;">
   <div class="bar-title-row" id="chapter-title-bar">
     <div class="chapter-title-view" id="chapter-title-view">
-      <h1 id="chapter-title-heading">{{ ch.title }}</h1>
+      <h1 class="page-title" id="chapter-title-heading">{{ ch.title }}</h1>
       <button type="button" class="btn-icon chapter-title-edit-btn" id="btn-rename-chapter" aria-label="重命名">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
       </button>
@@ -123,8 +172,6 @@
       data-rename-url="/teacher/chapters/{{ ch.id }}/rename"
       autocomplete="off" spellcheck="false" />
   </div>
-  <div class="bar-actions">
-    <a class="btn secondary" href="/teacher">返回列表</a>
   </div>
 </div>
 
@@ -137,31 +184,36 @@
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">章节练习发布</h2>
-  <p>须符合 <strong>version 1</strong> 章 JSON。左侧为只读模板，右侧粘贴其他工具生成的章 JSON。点「保存草稿」仅写入库；点「发布」会<strong>同时提交当前编辑区</strong>里的 JSON 并发布（不必先保存）。「取消发布」可随时点击；有已发布练习时会撤回，学生端将看不到；若无已发布内容会提示。若 HTMX 未加载，表单仍可常规提交。</p>
-  <div class="draft-actions">
+  <div class="section-header">
+    <h2>章节练习发布</h2>
+  </div>
+  <div class="publish-toolbar">
     <form
       id="fdraft"
       method="post"
       action="/teacher/chapters/{{ ch.id }}/save-draft"
     >
-      <button
-        type="submit"
-        hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
-        hx-include="#id-draft"
-      >保存草稿</button>
-      <button
-        type="submit"
-        style="background:#16a34a"
-        formaction="/teacher/chapters/{{ ch.id }}/publish"
-        formmethod="post"
-        hx-post="/teacher/chapters/{{ ch.id }}/publish"
-        hx-include="#id-draft"
-        hx-target="#flash"
-        hx-swap="innerHTML"
-      >发布</button>
+      <div class="form-actions mt-0">
+        <button
+          type="submit"
+          class="secondary"
+          hx-post="/teacher/chapters/{{ ch.id }}/save-draft"
+          hx-include="#id-draft"
+        >保存草稿</button>
+        <button
+          type="submit"
+          class="btn-publish"
+          formaction="/teacher/chapters/{{ ch.id }}/publish"
+          formmethod="post"
+          hx-post="/teacher/chapters/{{ ch.id }}/publish"
+          hx-include="#id-draft"
+          hx-target="#flash"
+          hx-swap="innerHTML"
+        >发布</button>
+      </div>
     </form>
     <form
+      class="unpublish-form"
       method="post"
       action="/teacher/chapters/{{ ch.id }}/unpublish"
       hx-post="/teacher/chapters/{{ ch.id }}/unpublish"
@@ -169,10 +221,11 @@
       hx-swap="innerHTML"
       hx-confirm="确定取消发布？学生端将看不到本章节练习。"
     >
-      <button type="submit" style="background:#b91c1c;color:#fff" formnovalidate>
+      <button type="submit" class="btn-danger-solid" formnovalidate>
         取消发布
       </button>
     </form>
+    <a class="btn secondary chapter-toolbar-back" href="/teacher">返回章节练习</a>
   </div>
   <div class="draft-dual">
     <div class="draft-col draft-col--template">
@@ -188,7 +241,8 @@
     </div>
   </div>
   <p class="draft-footer-note">
-    当前状态：<strong>{{ content_status_zh(ch.content_status) }}</strong>。发布时以当前编辑区 JSON 为准（与「保存草稿」使用同一份内容）。</p>
+    当前状态：<strong>{{ content_status_zh(ch.content_status) }}</strong>。
+  </p>
 </div>
 <script>
 (function () {
@@ -428,8 +482,13 @@
       {% if b.get('knowledgeHtml') %}<div class="jnb-md-cell">{{ b.get('knowledgeHtml', '')|safe }}</div>{% endif %}
       {% set g = b.get('guideCell') %}
       {% if g %}
+      {% set guide_label = exercise_number_label(bi * 2 + 1) %}
+      {% set guide_title = exercise_title_without_leading_label(g.get('exerciseTitle'), guide_label) or '基础练习' %}
       <h3 class="jnb-h3">基础练习</h3>
-      <h4 class="jnb-h4">{{ g.get('exerciseTitle') or '第 1 题（基础）' }}</h4>
+      <h4 class="jnb-h4 jnb-exercise-title">
+        <span class="jnb-exercise-no">{{ guide_label }}</span>
+        <span>{{ guide_title }}</span>
+      </h4>
       <div class="jnb-md-cell">{{ g.get('description', '')|safe }}</div>
       {% if g.get('expectedOutput') %}
       <div class="jnb-expected">
@@ -458,8 +517,13 @@
       {% endif %}
       {% set ex = b.get('extensionCell') %}
       {% if ex %}
+      {% set extension_label = exercise_number_label(bi * 2 + 2) %}
+      {% set extension_title = exercise_title_without_leading_label(ex.get('exerciseTitle'), extension_label) or '扩展练习' %}
       <h3 class="jnb-h3 jnb-h3--ext">扩展练习</h3>
-      <h4 class="jnb-h4">{{ ex.get('exerciseTitle') or '第 1 题（扩展）' }}</h4>
+      <h4 class="jnb-h4 jnb-exercise-title">
+        <span class="jnb-exercise-no">{{ extension_label }}</span>
+        <span>{{ extension_title }}</span>
+      </h4>
       <div class="jnb-md-cell">{{ (ex.get('promptHtml') or '')|safe }}</div>
       {% if ex.get('expectedOutput') %}
       <div class="jnb-expected">
@@ -500,7 +564,8 @@
 </div>
 {% endif %}
 
-<nav class="bar-actions chapter-edit-bottom-nav" aria-label="页面底部">
-  <a class="btn secondary" href="/teacher">返回列表</a>
-</nav>
+<div class="chapter-edit-back-wrap">
+  <a class="btn secondary chapter-toolbar-back" href="/teacher">返回章节练习</a>
+</div>
+
 {% endblock %}

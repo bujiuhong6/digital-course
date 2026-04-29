@@ -1,42 +1,46 @@
 {% extends "teacher/base.html" %}
 {% block title %}{{ ch.title }} — 完成记录{% endblock %}
 {% block body %}
-<div class="bar">
-  <h1>完成记录</h1>
-  <div class="bar-actions">
-    <span style="color:var(--muted)">{{ ch.title }}</span>
-    <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/edit">编辑章</a>
-    <a class="btn secondary" href="/teacher">返回列表</a>
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">完成记录</h1>
+  </div>
+  <div class="page-heading-actions">
+    <a class="btn secondary" href="/teacher">返回概览</a>
   </div>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">学生提交（标记本章完成）</h2>
-  <form method="get" action="/teacher/chapters/{{ ch.id }}/completions" style="margin:0 0 0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
-    <label for="cid">仅看班级</label>
-    <select id="cid" name="classId" onchange="this.form.submit()">
-      <option value="" {% if not filter_class_id %}selected{% endif %}>全部</option>
-      {% for cl in all_classes %}
-      <option value="{{ cl.id }}" {% if filter_class and filter_class.id == cl.id %}selected{% endif %}>{{ cl.name }}</option>
-      {% endfor %}
-    </select>
-  </form>
+  <div class="section-header">
+    <h2>学生提交（标记本章完成）</h2>
+  </div>
+  <div class="toolbar completions-toolbar">
+    <form method="get" action="/teacher/chapters/{{ ch.id }}/completions" class="toolbar-field completions-filter">
+      <label for="cid">仅看班级</label>
+      <select id="cid" name="classId" onchange="this.form.submit()">
+        <option value="" {% if not filter_class_id %}selected{% endif %}>全部</option>
+        {% for cl in all_classes %}
+        <option value="{{ cl.id }}" {% if filter_class and filter_class.id == cl.id %}selected{% endif %}>{{ cl.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <div class="toolbar-actions">
+      <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/completions/export{% if filter_class_id %}?classId={{ filter_class_id }}{% endif %}">导出 CSV（学号、姓名）</a>
+    </div>
+  </div>
   {% if filter_class %}
-  <p style="margin:0 0 0.5rem;font-size:0.9rem;color:var(--muted)">当前筛选：<strong>{{ filter_class.name }}</strong></p>
+  <p class="muted" style="margin:0 0 0.5rem;font-size:0.9rem">当前筛选：<strong>{{ filter_class.name }}</strong></p>
   {% endif %}
-  <p style="margin:0 0 0.75rem"><strong>本列表人数：</strong> {{ submit_count }}</p>
-  <p style="margin:0.5rem 0 1rem">
-    <a class="btn secondary" href="/teacher/chapters/{{ ch.id }}/completions/export{% if filter_class_id %}?classId={{ filter_class_id }}{% endif %}">导出 CSV（学号、姓名）</a>
-  </p>
+  <p style="margin:1rem 0 0.75rem"><strong>本列表人数：</strong> {{ submit_count }}</p>
   {% if not completions %}
   <p>暂无记录。</p>
   {% else %}
   <table>
     <thead>
       <tr>
-        <th>学号</th>
-        <th>姓名</th>
-        <th>完成时间（UTC）</th>
+        <th scope="col">学号</th>
+        <th scope="col">姓名</th>
+        <th scope="col">完成时间（UTC）</th>
       </tr>
     </thead>
     <tbody>

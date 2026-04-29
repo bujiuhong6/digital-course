@@ -1,23 +1,104 @@
 {% extends "teacher/base.html" %}
-{% block title %}名单{% endblock %}
+{% block title %}学生名单{% endblock %}
 {% block head %}
-<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous" defer></script>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" crossorigin="anonymous"></script>
 <style>
-  #roster-bulk-class-dialog { border: 1px solid #2d3a4d; border-radius: 8px; padding: 0; background: var(--card, #1a2332); color: var(--text, #e7ecf3); max-width: 22rem; }
-  #roster-bulk-class-dialog::backdrop { background: rgba(0,0,0,0.55); }
-  #roster-bulk-class-dialog .roster-dialog-body { padding: 1.1rem 1.25rem; }
-  #roster-bulk-class-dialog .roster-dialog-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; padding: 0 1.25rem 1.1rem; }
-  #roster-bulk-class-dialog h3 { margin: 0 0 0.5rem; font-size: 1.05rem; }
-  #roster-bulk-class-dialog p.roster-dialog-help { margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--muted, #8b9cb3); }
-  #roster-bulk-class-dialog select { width: 100%; padding: 0.5rem 0.65rem; border: 1px solid #2d3a4d; border-radius: 6px; background: #0c1018; color: inherit; }
+  .roster-class-th {
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .roster-class-th-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+  }
+  details.roster-class-filter-menu {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    line-height: 0;
+  }
+  details.roster-class-filter-menu > summary.roster-class-filter-summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    margin: 0;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--muted);
+    cursor: pointer;
+    transition: var(--transition);
+    box-sizing: border-box;
+  }
+  details.roster-class-filter-menu > summary.roster-class-filter-summary::-webkit-details-marker {
+    display: none;
+  }
+  details.roster-class-filter-menu > summary.roster-class-filter-summary:hover {
+    border-color: var(--accent);
+    background: var(--bg-muted);
+    color: var(--accent);
+  }
+  details.roster-class-filter-menu[open] > summary.roster-class-filter-summary {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.08);
+  }
+  summary.roster-class-filter-summary.is-on {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.06);
+  }
+  .roster-class-filter-icon {
+    display: block;
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+  .roster-class-filter-panel {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.25rem;
+    min-width: 11rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: 0.3rem 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+    z-index: 30;
+  }
+  .roster-class-filter-panel a {
+    display: block;
+    padding: 0.4rem 0.75rem;
+    color: inherit;
+    text-decoration: none;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    border: 0;
+  }
+  .roster-class-filter-panel a:hover {
+    background: var(--bg-muted);
+  }
+  .roster-class-filter-panel a.is-active {
+    font-weight: 600;
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.08);
+  }
 </style>
 {% endblock %}
 {% block body %}
-<div class="bar">
-  <h1>名单</h1>
-  <div class="bar-actions">
-    <a class="btn secondary" href="/teacher/classes">班级</a>
-    <a class="btn secondary" href="/teacher">返回</a>
+<div class="page-heading">
+  <div class="page-title-group">
+    <h1 class="page-title">学生名单</h1>
   </div>
 </div>
 
@@ -28,45 +109,88 @@
 {% endif %}
 
 <div class="card" id="roster-file-import">
-  <h2 style="margin-top:0">批量导入名单</h2>
-  <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，UTF-8；第一行表头须含 <strong>学号</strong>、<strong>姓名</strong>、<strong>班级</strong> 三列（「班级」可留空，系统会按名称建班/分班）。<strong>每次导入会先用新文件覆盖「未分班」的当前名单行</strong>（已分入某班的记录不受影响），再写入本次文件中的行。</p>
+  <div class="section-header">
+    <h2>批量导入名单</h2>
+  </div>
+  <p>上传 <strong>CSV</strong> 或 <strong>XLSX</strong>，第一行表头须含 <strong>学号</strong>、<strong>姓名</strong>、<strong>班级</strong> 三列（「班级」可留空，系统会按名称建班/分班）。<strong>导入时仅会为当前系统中尚不存在的学号追加名单行</strong>（已有学号不改动）；下列表按<strong>学号升序</strong>排列。</p>
   <form
+    action="/teacher/roster/import"
+    method="post"
+    enctype="multipart/form-data"
     hx-post="/teacher/roster/import"
     hx-encoding="multipart/form-data"
     hx-target="#roster-result"
     hx-swap="innerHTML"
+    class="toolbar"
   >
-    <label for="f">选择文件</label>
-    <input id="f" name="file" type="file" required accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
-    <p><button type="submit">导入</button></p>
+    <div class="toolbar-field toolbar-field-grow">
+      <label for="f">选择文件</label>
+      <input id="f" name="file" type="file" required accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
+    </div>
+    <div class="toolbar-actions">
+      <button type="submit">导入</button>
+    </div>
   </form>
   <div id="roster-result"></div>
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0">当前名单行</h2>
-  <p style="color:var(--muted);font-size:0.9rem">仅显示<strong>未分班</strong>的名单行。已分入某班后请在「<a href="/teacher/classes">班级</a>」对应班级页查看与调整。可勾选后批量删除本表中的行。</p>
-  {% if not rows %}
+  <div class="section-header">
+    <h2>当前导入名单</h2>
+  </div>
+  <p class="muted" style="font-size:0.9rem;line-height:1.5">列示当前仍有效的全部名单行（含已分班）。勾选后可<strong>移出所选名单</strong>（软删除）；该学号需再通过「批量导入名单」录入方会重新出现在本页。</p>
+  {% if roster_unfiltered_count == 0 %}
   <p>暂无记录。</p>
   {% else %}
-  <form id="roster-pending-delete-form" method="post" action="/teacher/roster/entries/delete" style="margin:0 0 0.75rem 0">
-    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
-      <button type="submit" class="secondary" style="padding:0.35rem 0.6rem" onclick="return confirm('确定删除所选未分班名单行？');">删除所选</button>
-      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-pending-tbody').querySelectorAll('input.js-roster-pending-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=true">全选本表</button>
-      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-pending-tbody').querySelectorAll('input.js-roster-pending-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=false">取消全选</button>
-    </div>
-  </form>
+  {% if rows %}
+  <div class="bulk-toolbar" role="group" aria-label="名单批量移出">
+    <button type="submit" class="secondary sm" form="roster-pending-delete-form" onclick="return confirm('确定将所选名单行移出当前名单？移出后需再通过「批量导入」填入该学号方可重新出现在本列表；不影响学生账号是否仍存在。');">移出所选名单</button>
+    <button type="button" class="secondary sm" onclick="var t=document.getElementById('roster-pending-tbody').querySelectorAll('input.js-roster-pending-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=true">全选</button>
+    <button type="button" class="secondary sm" onclick="var t=document.getElementById('roster-pending-tbody').querySelectorAll('input.js-roster-pending-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=false">取消全选</button>
+  </div>
+  {% endif %}
+  <form id="roster-pending-delete-form" method="post" action="/teacher/roster/entries/delete"></form>
   <table>
     <thead>
       <tr>
-        <th style="width:2.5rem"><span class="visually-hidden">选择</span></th>
-        <th>学号</th>
-        <th>姓名</th>
-        <th>班级</th>
-        <th>状态</th>
+        <th scope="col" style="width:2.5rem">
+          <span class="visually-hidden">选择</span>
+          {% if rows %}
+          <input type="checkbox" id="roster-list-select-all" title="全选本表" aria-label="全选当前导入名单"/>
+          {% endif %}
+        </th>
+        <th scope="col">学号</th>
+        <th scope="col">姓名</th>
+        <th scope="col">注册</th>
+        <th scope="col" class="roster-class-th">
+          <div class="roster-class-th-inner">
+            <span>所在班级</span>
+            <details class="roster-class-filter-menu">
+              <summary
+                class="roster-class-filter-summary{% if roster_class_filter is not none %} is-on{% endif %}"
+                aria-haspopup="true"
+                aria-label="按所在班级筛选"
+                title="按所在班级筛选"
+              >
+                <!-- Excel 风格：漏斗筛选 -->
+                <svg class="roster-class-filter-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 3H2l8 9.46V19l4 2v-6.54L22 3z"/>
+                </svg>
+              </summary>
+              <div class="roster-class-filter-panel" role="menu">
+                <a href="/teacher/roster" role="menuitem" class="{% if roster_class_filter is none %}is-active{% endif %}">全部</a>
+                <a href="/teacher/roster?roster_class=unassigned" role="menuitem" class="{% if roster_class_filter == 'unassigned' %}is-active{% endif %}">未分配</a>
+                {% for c in roster_filter_classes %}
+                <a href="/teacher/roster?roster_class={{ c.id }}" role="menuitem" class="{% if roster_class_filter == (c.id | string) %}is-active{% endif %}">{{ c.name }}</a>
+                {% endfor %}
+              </div>
+            </details>
+          </div>
+        </th>
       </tr>
     </thead>
     <tbody id="roster-pending-tbody">
+      {% if rows %}
       {% for r in rows %}
       <tr>
         <td>
@@ -81,140 +205,38 @@
         </td>
         <td><code>{{ r.student_no }}</code></td>
         <td>{{ r.full_name }}</td>
-        <td>{% if r.class_ %}{{ r.class_.name }}{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if r.status == "bound" %}已注册{% else %}未注册{% endif %}</td>
+        <td>{% if r.class_ %}{{ r.class_.name }}{% else %}<span class="muted">未分配</span>{% endif %}</td>
       </tr>
       {% endfor %}
+      {% else %}
+      <tr>
+        <td colspan="5">
+          {% if roster_class_filter is not none %}
+          当前<strong>筛选</strong>下暂无名单行。<a href="/teacher/roster">清除筛选</a> 后可查看全部 {{ roster_unfiltered_count }} 条。
+          {% else %}
+          暂无记录。
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
-  {% endif %}
-</div>
-
-<div class="card">
-  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-start;justify-content:space-between;margin-bottom:0.75rem">
-    <h2 style="margin:0">已注册学生与班级</h2>
-    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
-      {% if reg_students %}
-      <button type="submit" class="secondary" form="roster-bulk-class-form" formaction="/teacher/students/bulk-unregister" formmethod="post" style="padding:0.35rem 0.6rem" onclick="return confirm('确定取消所选学生的注册？取消后将无法登录，直至凭名单再次注册。');">批量取消注册</button>
-      {% endif %}
-    </div>
-  </div>
-  <p style="color:var(--muted);font-size:0.9rem">在「<a href="/teacher/classes">班级</a>」页新建班级后，在此筛选、单条或批量设班；导入时填写「班级」列可自动建班/分班。完成记录可在章节提交页按班级过滤。</p>
-  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;margin-bottom:0.75rem">
-    <label for="roster-class-filter" style="font-size:0.9rem;color:var(--muted)">按班级筛选</label>
-    <select id="roster-class-filter" onchange="location.href='/teacher/roster'+(this.value?('?classId='+encodeURIComponent(this.value)):'')">
-      <option value="" {% if not roster_class_id_filter or roster_class_id_filter == '' %}selected{% endif %}>全部班级</option>
-      <option value="unassigned" {% if roster_class_id_filter == 'unassigned' or roster_class_id_filter == 'none' %}selected{% endif %}>未分班</option>
-      {% for cl in classes %}
-      <option value="{{ cl.id }}" {% if roster_class_id_filter == (cl.id|string) %}selected{% endif %}>{{ cl.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  {% if reg_students %}
-  <form id="roster-bulk-class-form" method="post" action="/teacher/students/bulk-set-class" style="margin:0 0 0.5rem 0">
-    <input type="hidden" name="return_class_id" value="{{ (roster_class_id_filter|default(''))|e }}" />
-    <input type="hidden" name="class_id" id="roster-bulk-class-id-hidden" value="" />
-    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
-      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" id="roster-bulk-class-open-btn" aria-haspopup="dialog" aria-controls="roster-bulk-class-dialog">批量设班</button>
-      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-student-tbody').querySelectorAll('input.js-roster-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=true">全选本页</button>
-      <button type="button" class="secondary" style="padding:0.35rem 0.6rem" onclick="var t=document.getElementById('roster-student-tbody').querySelectorAll('input.js-roster-cb'); for(var i=0;i&lt;t.length;i++) t[i].checked=false">取消全选</button>
-    </div>
-  </form>
-  <dialog id="roster-bulk-class-dialog" aria-modal="true" aria-labelledby="roster-bulk-class-dialog-title">
-    <div class="roster-dialog-body">
-      <h3 id="roster-bulk-class-dialog-title">批量设班</h3>
-      <p class="roster-dialog-help">将为已勾选学生设置班级。</p>
-      <label for="roster-bulk-class-modal-select">目标班级</label>
-      <select id="roster-bulk-class-modal-select" aria-label="将所选学生设为此班级">
-        <option value="">未分班（移出所有所选）</option>
-        {% for cl in classes %}
-        <option value="{{ cl.id }}">{{ cl.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="roster-dialog-actions">
-      <button type="button" class="secondary" id="roster-bulk-class-dialog-cancel">取消</button>
-      <button type="button" id="roster-bulk-class-dialog-confirm">确定</button>
-    </div>
-  </dialog>
+  {% if rows %}
   <script>
   (function () {
-    var form = document.getElementById('roster-bulk-class-form');
-    var dlg = document.getElementById('roster-bulk-class-dialog');
-    var openBtn = document.getElementById('roster-bulk-class-open-btn');
-    var hiddenClass = document.getElementById('roster-bulk-class-id-hidden');
-    var sel = document.getElementById('roster-bulk-class-modal-select');
-    var cancelBtn = document.getElementById('roster-bulk-class-dialog-cancel');
-    var confirmBtn = document.getElementById('roster-bulk-class-dialog-confirm');
-    var noneMsg = '请至少勾选一名学生后再批量设班。';
-    function countChecked() {
-      return document.querySelectorAll('#roster-student-tbody input.js-roster-cb:checked').length;
-    }
-    function openDialog() {
-      if (countChecked() < 1) {
-        window.alert(noneMsg);
-        return;
-      }
-      sel.value = '';
-      dlg.showModal();
-      sel.focus();
-    }
-    function closeDialog() {
-      if (dlg.open) dlg.close();
-    }
-    openBtn.addEventListener('click', openDialog);
-    cancelBtn.addEventListener('click', closeDialog);
-    confirmBtn.addEventListener('click', function () {
-      hiddenClass.value = sel.value;
-      closeDialog();
-      form.submit();
-    });
-    dlg.addEventListener('close', function () {
-      openBtn.focus();
+    var hdr = document.getElementById("roster-list-select-all");
+    var bodyEl = document.getElementById("roster-pending-tbody");
+    if (!hdr || !bodyEl) return;
+    hdr.addEventListener("change", function () {
+      var checked = hdr.checked;
+      var boxes = bodyEl.querySelectorAll("input.js-roster-pending-cb");
+      for (var i = 0; i < boxes.length; i++) boxes[i].checked = checked;
     });
   })();
   </script>
   {% endif %}
-  {% if not reg_students %}
-  <p>当前筛选下尚无已注册学生。可先<a href="#roster-file-import">导入名单</a>后注册，或换筛选条件。</p>
-  {% else %}
-  <table>
-    <thead>
-      <tr>
-        <th style="width:2.5rem"><span class="visually-hidden">选择</span></th>
-        <th>学号</th>
-        <th>姓名</th>
-        <th>班级</th>
-        <th>操作</th>
-      </tr>
-    </thead>
-    <tbody id="roster-student-tbody">
-      {% for s in reg_students %}
-      <tr>
-        <td>
-          <input class="js-roster-cb" type="checkbox" name="student_ids" value="{{ s.id }}" form="roster-bulk-class-form" />
-        </td>
-        <td><code>{{ s.student_no }}</code></td>
-        <td>{{ s.full_name }}</td>
-        <td>{% if s.class %}{{ s.class.name }}{% else %}<span class="muted">未分班</span>{% endif %}</td>
-        <td>
-          <form method="post" action="/teacher/students/{{ s.id }}/set-class" style="display:inline-flex;gap:0.35rem;align-items:center;margin:0;flex-wrap:wrap">
-            <input type="hidden" name="return_to" value="roster" />
-            <input type="hidden" name="return_class_id" value="{{ (roster_class_id_filter|default(''))|e }}" />
-            <label for="c-{{ s.id }}" style="font-size:0.85rem;color:var(--muted)">设班</label>
-            <select id="c-{{ s.id }}" name="class_id" style="max-width:12rem">
-              <option value="" {% if not s.class_id %}selected{% endif %}>未分班</option>
-              {% for cl in classes %}
-              <option value="{{ cl.id }}" {% if s.class_id and s.class_id == cl.id %}selected{% endif %}>{{ cl.name }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="secondary" style="padding:0.25rem 0.5rem">保存</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
   {% endif %}
 </div>
+
 {% endblock %}
