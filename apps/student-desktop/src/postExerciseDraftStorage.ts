@@ -1,5 +1,5 @@
 /**
- * 课后练习作答草稿（questionId → 单选 option id 或文本/代码），按学生 id 与练习 id 存 localStorage。
+ * 课后作业作答草稿（questionId → 单选 option id 或文本/代码），按学生 id 与练习 id 存 localStorage。
  */
 
 const PREFIX = "sd-post-exercise-draft-v1:";

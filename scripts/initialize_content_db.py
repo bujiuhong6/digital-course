@@ -124,7 +124,7 @@ def main() -> None:
         action="store_true",
         help=(
             "DANGEROUS: allow this script to overwrite seed-matching AI classroom content "
-            "and delete extra chapters. AI智能预习、AI课堂助教、AI课后练习 are protected "
+            "and delete extra chapters. AI智能预习、AI课堂练习、AI课后作业 are protected "
             "unless this flag is explicitly supplied."
         ),
     )

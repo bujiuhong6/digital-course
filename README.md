@@ -1,15 +1,19 @@
 # digital-course
 
-《数字技术与应用》AI 智能编程教学平台。仓库包含教师端 FastAPI 页面、学生端 Tauri/React 桌面应用、Pyodide 代码执行、章节练习发布、学生进度记录和 OpenAI 兼容大语言模型接入。
+《数字技术与应用》AI 智能编程学习平台。项目包含教师端 FastAPI 管理台、学生端 React/Tauri 桌面应用、Pyodide 代码执行、学生名单与班级管理、OpenAI 兼容大模型接入，以及三类课程模块：
 
-本仓库提交的是代码、迁移、静态资源和章节 seed。运行时数据库、管理员账号、学生名单、答题记录、本地 `.env` 与 API Key 均不提交。
+- `AI智能预习`：教师发布课前目标与预习任务，学生提交反馈。
+- `AI课堂练习`：学生进入章节练习，完成随堂编程任务，页面内提供 AI 助教陪练。
+- `AI课后作业`：教师发布单选、主观、代码混合题，学生提交后由大模型批改并返回分数和反馈。
+
+本仓库提交代码、迁移、静态资源、测试和课程 seed。运行时 SQLite 数据库、管理员账号、学生名单、班级、学生账号、答题记录、本地 `.env` 与 API Key 均留在本机。
 
 ## 目录
 
-- `services/api/`：FastAPI 后端、教师端 HTML、学生 REST、聊天代理、数据库迁移。
-- `apps/student-desktop/`：学生端 Tauri + React + Vite 应用。
-- `services/api/seeds/chapters.json`：已发布章节练习 seed。保留课程题目，不包含学生、名单、班级、管理员和答题记录。
-- `scripts/initialize_content_db.py`：用 seed 初始化数据库，并清空运行时数据。
+- `services/api/`：FastAPI 后端、教师端 HTML 页面、学生 REST API、聊天代理、数据库模型与 Alembic 迁移。
+- `apps/student-desktop/`：学生端 React + Vite + Tauri 应用，含 Pyodide 代码练习界面。
+- `services/api/seeds/chapters.json`：基础课堂练习 seed，不包含运行时账号、名单、班级和答题记录。
+- `scripts/initialize_content_db.py`：初始化本地数据库；默认保护已设计的课程内容，清空运行时数据。
 
 ## 初始化 API
 
@@ -24,7 +28,13 @@ cd ../..
 services/api/.venv/bin/python scripts/initialize_content_db.py --prune-extra-chapters
 ```
 
-初始化后数据库只保留章节练习内容。教师端首次进入会提示设置管理员账号和密码；学生名单、班级、学生账号和答题记录为空。
+初始化脚本会补齐 seed 中缺失的课堂练习内容，并保留已经存在的 `AI智能预习`、`AI课堂练习`、`AI课后作业` 内容。它会清空管理员账号、学生名单、班级、学生账号、答题记录和审计记录；教师端首次进入会提示设置管理员账号和密码。
+
+如只想补齐课程 seed 并保留运行时数据：
+
+```bash
+services/api/.venv/bin/python scripts/initialize_content_db.py --keep-runtime
+```
 
 启动 API：
 
@@ -40,6 +50,15 @@ curl http://127.0.0.1:8000/health
 ```
 
 教师端入口：`http://127.0.0.1:8000/teacher/login`
+
+常用教师端页面：
+
+- `http://127.0.0.1:8000/teacher/prestudy`：AI智能预习。
+- `http://127.0.0.1:8000/teacher`：AI课堂练习。
+- `http://127.0.0.1:8000/teacher/post-exercises`：AI课后作业。
+- `http://127.0.0.1:8000/teacher/llm-settings`：大模型接入。
+- `http://127.0.0.1:8000/teacher/roster`：学生名单。
+- `http://127.0.0.1:8000/teacher/classes`：班级管理。
 
 ## 启动学生端
 
@@ -60,7 +79,7 @@ cd apps/student-desktop
 pnpm tauri dev
 ```
 
-学生端开发默认通过 Vite 代理访问 API：`/v1` → `http://127.0.0.1:8000`。API 需要先启动。
+学生端开发默认通过 Vite 代理访问 API：`/v1` → `http://127.0.0.1:8000`。API 需要先启动。学生使用教师端名单中的学号与姓名注册，登录后可在三个模块之间切换。
 
 ## 接入大语言模型
 
@@ -101,7 +120,7 @@ CHAPTER_GEN_MODEL=deepseek-ai/DeepSeek-V4-Flash
 CHAT_MODEL=deepseek-ai/DeepSeek-V4-Flash
 ```
 
-`CHAT_LLM_BASE_URL` / `CHAT_LLM_API_KEY` 可单独配置学生 AI 助手；未设置时回退到 `LLM_BASE_URL` / `LLM_API_KEY`。
+`CHAT_LLM_BASE_URL` / `CHAT_LLM_API_KEY` 可单独配置学生 AI 助手；未设置时回退到 `LLM_BASE_URL` / `LLM_API_KEY`。教师端的「大模型接入」也可维护运行时配置。
 
 ## 测试
 
@@ -125,4 +144,4 @@ pnpm build
 
 - 不提交 `services/api/.env`、`apps/student-desktop/.env`、SQLite 数据库、虚拟环境、缓存和本地截图。
 - 推送前可用 `git status --short` 和敏感词扫描确认没有 API Key。
-- `AI智能预习`、`AI课堂助教`、`AI课后练习` 属于程序设计好的课程内容。运行 `scripts/initialize_content_db.py` 默认只补齐缺失 seed，并清空学生、名单、班级、提交记录等运行时数据；不会覆盖或删除已有三类课程内容。
+- `AI智能预习`、`AI课堂练习`、`AI课后作业` 属于程序设计好的课程内容。运行 `scripts/initialize_content_db.py` 默认只补齐缺失 seed，并清空学生、名单、班级、提交记录等运行时数据；已有三类课程内容会被保留。

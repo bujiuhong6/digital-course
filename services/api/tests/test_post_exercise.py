@@ -69,7 +69,7 @@ def _save_llm_config(client, base_url: str = "https://grade.test") -> None:
 
 def _published_post_exercise(client) -> str:
     client.post("/v1/admin/bootstrap", json={"password": "pw-123456"})
-    create = client.post("/v1/admin/post-exercises", json={"title": "课后练习1", "order": 1})
+    create = client.post("/v1/admin/post-exercises", json={"title": "课后作业1", "order": 1})
     assert create.status_code == 201, create.text
     eid = create.json()["exerciseId"]
     publish = client.post(f"/v1/admin/post-exercises/{eid}/publish", json=_content())

@@ -1,6 +1,6 @@
 # Teaching API（`services/api`）
 
-FastAPI 应用，负责教师端 HTML、学生 REST、章发布、聊天代理等。
+FastAPI 应用，负责教师端 HTML、学生 REST API、学生名单与班级管理、课程内容发布、聊天代理和 OpenAI 兼容大模型接入。
 
 ## 本地运行
 
@@ -18,9 +18,9 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ## 初始化课程内容
 
-仓库不提交本地 SQLite 数据库。`AI智能预习`、`AI课堂助教`、`AI课后练习` 都属于程序设计好的课程内容；初始化脚本默认会保护这些内容，已经存在的内容不会被覆盖或删除。
+仓库提交代码、迁移、测试和 seed；本地 SQLite 数据库留在运行环境。`AI智能预习`、`AI课堂练习`、`AI课后作业` 都属于程序设计好的课程内容；初始化脚本默认保护这些内容。
 
-基础课堂助教 seed 保存在 `services/api/seeds/chapters.json`，其中不包含管理员账号、学生名单、班级、学生账号、答题记录和审计记录。
+基础课堂练习 seed 保存在 `services/api/seeds/chapters.json`，其中不包含管理员账号、学生名单、班级、学生账号、答题记录和审计记录。
 
 从仓库根目录执行：
 
@@ -30,12 +30,12 @@ services/api/.venv/bin/python scripts/initialize_content_db.py --prune-extra-cha
 
 效果：
 
-- 补齐 seed 中缺失的已发布课堂助教章节。
-- 保留已有 `AI智能预习`、`AI课堂助教`、`AI课后练习` 内容。
+- 补齐 seed 中缺失的已发布课堂练习章节。
+- 保留已有 `AI智能预习`、`AI课堂练习`、`AI课后作业` 内容。
 - 清空 `admin_config`、`students`、`classes`、`roster_entries`、`cell_verifications`、`chapter_completions`、`admin_audit`。
 - 教师端下次访问 `/teacher/login` 时会进入首次管理员账号设置流程。
 
-`--prune-extra-chapters` 会被保护逻辑拦住：默认不会删除教师已设计/发布的额外课堂助教章节。只有显式加 `--allow-delete-designed-content` 时，才会允许覆盖 seed 中同 slug 的课堂助教内容并删除 seed 外章节。
+`--prune-extra-chapters` 会被保护逻辑拦住：默认保留教师已设计/发布的额外课堂练习章节。显式加 `--allow-delete-designed-content` 时，脚本才会允许覆盖 seed 中同 slug 的课堂练习内容并删除 seed 外章节。
 
 如只想导入章节并保留运行时数据：
 
