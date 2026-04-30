@@ -12,6 +12,7 @@ dist
 dist-ssr
 .vite
 *.local
+public/pyodide/
 
 # Rust / Tauri
 src-tauri/target

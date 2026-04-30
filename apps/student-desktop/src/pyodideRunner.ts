@@ -1,6 +1,5 @@
 /**
- * 浏览器中加载 Pyodide（全局 `loadPyodide`）并执行用户代码，捕获 stdout/stderr。
- * 若 index 里脚本因网络/顺序未加载，会动态插入同一 CDN 脚本并重试（任务 12）。
+ * 浏览器中加载本地自托管 Pyodide 并执行用户代码，捕获 stdout/stderr。
  */
 export type PyodideLike = {
   setStdout: (opts: { batched: (s: string) => void }) => void;
@@ -32,9 +31,8 @@ export type RunResult = {
   elapsedMs: number;
 };
 
-/* jsdelivr 上主包根目录的 pyodide.js 为 404；须用 full/ 下入口脚本 */
-const defaultScript =
-  "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js";
+const bundledPyodideBase = `${import.meta.env.BASE_URL}pyodide/v0.27.0/full/`;
+const defaultScript = `${bundledPyodideBase}pyodide.js`;
 function scriptUrl(): string {
   const u = import.meta.env.VITE_PYODIDE_SCRIPT_URL;
   if (u && String(u).trim()) {
@@ -43,7 +41,7 @@ function scriptUrl(): string {
   return defaultScript;
 }
 
-const defaultIndex = "https://cdn.jsdelivr.net/pyodide/v0.27.0/full/";
+const defaultIndex = bundledPyodideBase;
 
 let instance: PyodideWithPackages | null = null;
 let loadPromise: Promise<PyodideWithPackages> | null = null;
@@ -92,7 +90,7 @@ function injectPyodideScriptTag(): Promise<void> {
     s.onerror = () => {
       reject(
         new Error(
-          "无法从网络加载 pyodide.js。请检查网络/防火墙，或把 Pyodide 包放到可访问的 URL 后配置环境变量。",
+          "无法加载 pyodide.js。请确认学生端静态资源已完整构建并部署。",
         ),
       );
     };
@@ -101,13 +99,19 @@ function injectPyodideScriptTag(): Promise<void> {
 }
 
 /**
- * 等待全局 loadPyodide 出现：先等 index 里脚本，超时则动态插入并重试（首下可能较慢）。
+ * 等待全局 loadPyodide 出现；页面未预置脚本时动态插入本地 pyodide.js。
  */
 async function waitForLoadPyodideFunction(): Promise<
   (o?: { indexURL: string }) => Promise<PyodideWithPackages>
 > {
   const quick = 5000;
   const long = 120000;
+  if (
+    typeof getLoadPyodideFromWindow() !== "function" &&
+    !document.querySelector('script[src*="pyodide"]')
+  ) {
+    await injectPyodideScriptTag();
+  }
   if (
     await waitFor(
       () => typeof getLoadPyodideFromWindow() === "function",
@@ -130,7 +134,7 @@ async function waitForLoadPyodideFunction(): Promise<
     return getLoadPyodideFromWindow()!;
   }
   throw new Error(
-    "未找到 window.loadPyodide。请确认能访问 cdn.jsdelivr.net，或将 pyodide.js 自托管到 https 可访问处并在页面中引入。",
+    "未找到 window.loadPyodide。请确认学生端 Pyodide 静态资源已完整构建并部署。",
   );
 }
 
