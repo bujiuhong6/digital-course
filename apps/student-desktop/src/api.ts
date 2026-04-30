@@ -12,9 +12,12 @@ const viteProxyOn =
   import.meta.env.VITE_USE_VITE_PROXY === "true";
 const useViteProxy =
   !devProxyOff && (import.meta.env.DEV || viteProxyOn);
+const trimmed = raw === undefined ? undefined : raw.replace(/\/$/, "");
 export const API_BASE = useViteProxy
   ? ""
-  : (raw && raw.replace(/\/$/, "")) || "http://127.0.0.1:8000";
+  : trimmed !== undefined
+    ? trimmed
+    : "http://127.0.0.1:8000";
 
 const TOKEN_KEY = "student_access_token";
 

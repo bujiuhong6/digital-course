@@ -1,0 +1,17 @@
+[Unit]
+Description=Digital Course FastAPI (uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/www/wwwroot/digital-course/services/api
+EnvironmentFile=/www/wwwroot/digital-course/services/api/.env
+ExecStart=/www/wwwroot/digital-course/services/api/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
