@@ -18,6 +18,7 @@ export function StudentChat({ chapterId, getContext, contextKind = "chapter" }: 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const avatarSrc = `${import.meta.env.BASE_URL}ai-tutor-avatar.svg`;
 
   useEffect(() => {
     if (open && listRef.current) {
@@ -87,7 +88,7 @@ export function StudentChat({ chapterId, getContext, contextKind = "chapter" }: 
       >
         <img
           className="sd-chat-fab-icon"
-          src="/ai-tutor-avatar.svg"
+          src={avatarSrc}
           width={36}
           height={36}
           alt=""
@@ -105,7 +106,7 @@ export function StudentChat({ chapterId, getContext, contextKind = "chapter" }: 
         <header className="sd-chat-hd">
           <img
             className="sd-chat-hd-icon"
-            src="/ai-tutor-avatar.svg"
+            src={avatarSrc}
             width={24}
             height={24}
             alt=""
