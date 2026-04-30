@@ -1,19 +1,22 @@
-# 学生端桌面（Tauri + React + Vite）
+# 学生端 Web SPA（React + Vite）
 
-与教学 API 对接：**注册**（须与教师导入名单学号+姓名一致）→ **登录** → **已发布章节练习**（每行右侧显示**待完成** / **练习中** / **已提交**，由 `GET /v1/student/chapters` 的 `practiceStatus` 驱动）→ 章练习（Pyodide + cell 上报）。
+学生端现在以 Web SPA 为生产形态，部署在同域路径 `/student/`。目录名仍叫 `student-desktop`，`src-tauri/` 保留为历史桌面端实验源码。
+
+主流程：注册（须与教师导入名单学号 + 姓名一致）→ 登录 → `AI智能预习` / `AI课堂练习` / `AI课后作业` → Pyodide 代码执行、AI 助手或课后作业提交。
 
 ## 前置
 
 - `pnpm` 8+（或项目使用的包管理器）
-- **Rust**（Tauri 2；建议 **stable 1.8x+**）
-- 平台依赖见 [Tauri Linux prerequisites](https://tauri.app/start/prerequisites/)（本机构建时已安装 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev` 等）
+- 本地需先启动后端 API：`http://127.0.0.1:8000`
+- 只有运行 Tauri 实验入口时才需要 Rust 和 Tauri 平台依赖
 
 ## 配置
 
 复制 `.env.example` 为 `.env`。
 
-- **Tauri 开发**（`pnpm tauri dev`）：默认在 **Vite 开发服务里走代理**（`vite.config.ts` 中 `/v1` → `http://127.0.0.1:8000`），前端用**相对路径**调接口，与 `http://localhost:1420` 同域，避免 WebView 直接请求 `http://127.0.0.1:8000` 时出现 **Load failed / Failed to fetch**。本机需先启动 API。若你确认直连无问题，可在 `.env` 设 `VITE_DEV_API_PROXY=0` 并配置 `VITE_API_BASE_URL=http://127.0.0.1:8000`。
-- `VITE_API_BASE_URL`：打包/未走代理时使用的 API 根（无尾斜杠），同机一般为 `http://127.0.0.1:8000`。
+- 本地开发默认在 Vite 开发服务里走代理：`/v1` → `http://127.0.0.1:8000`。
+- 生产构建使用 `.env.production` 中的 `VITE_API_BASE_URL=`，让请求走同域相对路径 `/v1/...`，由 Nginx 反代到 FastAPI。
+- `VITE_API_BASE_URL`：未走代理时使用的 API 根（无尾斜杠）。
 - `VITE_PYODIDE_INDEX_URL`（**可选**）：Pyodide `full/` 包目录的 URL，须以 `/` 结尾。默认与 `index.html` 中加载的 0.27 版本一致；**离线/内网**时可自建镜像并只改本变量与 `index.html` 中的 `pyodide.js` 地址。
 - `VITE_PYODIDE_SCRIPT_URL`（**可选**）：`pyodide.js` 完整 URL（见 `.env.example`），与上项版本应一致。仅在动态注入脚本时生效，与 `index.html` 中已写死脚本并存时，以**实际加载的入口**为准。
 
@@ -23,34 +26,45 @@
 - **懒载（未实现）**：当前为「首次运行即全量装包」。若需缩短**进入页面**到**可点执行**的间隔，可后续将 `loadPackage` / `micropip.install` 迁到**首次点「执行」**之前的一步（思路：懒触发 `ensurePyodide` 或拆分轻量/重量包），届时在此 README 补充开关说明。
 - **作图在页面内**：学生代码使用 `matplotlib` 时，请在作图后调用 `plt.show()`，图形会出现在章练习的 **「图形输出」** 区；`stdout`/`stderr` 仍走原有判题与展示逻辑。
 
-**任务 12**：在 WebView 中加载 **Pyodide**（`index.html` 从 CDN 引入；首次运行会拉取包体）。进入已发布章后，按 `publishedContent.version===1` 的 `blocks` 以 **Notebook 式**（`In [n]:`、灰底代码区，与 design §2/§5 一致）展示**知识/引导/扩展**；样式在 `public/jupyter-cells.css`，与 `services/api/app/static/jupyter-cells.css` **内容应保持一致**（改一处请同步复制）。「执行」运行代码并上报 `POST /v1/student/cells/verify`；全部通过后可「提交本章练习」完成本章。
+Web 端通过 `index.html` 从 CDN 加载 Pyodide。进入已发布章后，按 `publishedContent.version===1` 的 `blocks` 以 Notebook 式样展示知识、引导和扩展；样式在 `public/jupyter-cells.css`，与 `services/api/app/static/jupyter-cells.css` 内容应保持一致。「执行」运行代码并上报 `POST /v1/student/cells/verify`；全部通过后可「提交本章练习」完成本章。
 
-**AI学习助手（Chat）**：章练习页左下角有 **Chat** 按钮，展开后调 `POST /v1/student/chat`，会把当前聚焦代码格的 `cellId` 与代码作为 `currentCode` 发给服务端（与 API 限流/鉴权一致）。未配 LLM 时返回 `mock: true` 的占位说明。
+**AI学习助手（Chat）**：章练习页左下角有 Chat 按钮，展开后调 `POST /v1/student/chat`，会把当前聚焦代码格的 `cellId` 与代码作为 `currentCode` 发给服务端（与 API 限流/鉴权一致）。未配 LLM 时返回 `mock: true` 的占位说明。
 
-**保存草稿**：章底部 **「保存」** 将各格当前代码写入本机 **localStorage**（按 `学生 id + 章 id` 隔离）；切章或清浏览器站点数据会丢失。**提交本章练习** 成功时清除该章草稿。列表「练习中」在服务端有通过记录，或本机有非空草稿时显示。
+**保存草稿**：章底部「保存」将各格当前代码写入浏览器 localStorage（按 `学生 id + 章 id` 隔离）；切章或清浏览器站点数据会丢失。「提交本章练习」成功时清除该章草稿。列表「练习中」在服务端有通过记录，或本机有非空草稿时显示。
 
 
 ## 开发
 
-在仓库根启动 API 后（`services/api` 内 `uvicorn app.main:app --reload` 等）：
+在仓库根启动 API 后：
 
 ```bash
 cd apps/student-desktop
 pnpm install
-pnpm tauri dev
+pnpm dev
 ```
 
-Vite 默认端口 **1420**；`services/api/app/main.py` 已允许该来源跨域。若你改了 Vite 端口，在 API 的 CORS 里加上对应 `http` 源。
+Vite 默认端口是 `1420`，访问 `http://127.0.0.1:1420/`。若出现 `ERR_CONNECTION_REFUSED`，先确认 `pnpm dev` 是否仍在运行。
 
 ## 生产构建
 
 ```bash
 cd apps/student-desktop
-pnpm tauri build
+pnpm build
 ```
 
-产物在 `src-tauri/target/release/bundle/`（因平台不同而异）。`src-tauri/target` 不提交，由本机构建生成。
+生产构建产物在 `dist/`。`vite.config.ts` 会在 build 时把资源路径改为 `/student/`，线上由 Nginx 从 `/www/wwwroot/digital-course/student-dist/` 提供静态文件。
+
+## Tauri 实验入口
+
+桌面端源码保留在 `src-tauri/`。当前生产部署走 Web SPA，桌面包只用于本机实验：
+
+```bash
+cd apps/student-desktop
+pnpm tauri dev
+```
+
+Tauri 构建产物在 `src-tauri/target/`，不提交。
 
 ## 你无需额外提供的资料
 
-MVP 流程使用已有学生账号（名单导入后注册、教师端发布的章）。只需本机/服务器上 API 可访问，并在 `.env` 中设好 `VITE_API_BASE_URL`。
+当前流程使用已有学生账号（名单导入后注册、教师端发布内容）。本地测试只需 API 可访问；生产构建默认走同域 `/v1/...`。

@@ -1,17 +1,17 @@
 # digital-course
 
-《数字技术与应用》AI 智能编程学习平台。项目包含教师端 FastAPI 管理台、学生端 React/Tauri 桌面应用、Pyodide 代码执行、学生名单与班级管理、OpenAI 兼容大模型接入，以及三类课程模块：
+《数字技术与应用》AI 智能编程学习平台。项目包含教师端 FastAPI 管理台、学生端 React/Vite Web SPA（含 Tauri 桌面源码）、Pyodide 代码执行、学生名单与班级管理、OpenAI 兼容大模型接入，以及三类课程模块：
 
 - `AI智能预习`：教师发布课前目标与预习任务，学生提交反馈。
 - `AI课堂练习`：学生进入章节练习，完成随堂编程任务，页面内提供 AI 助教陪练。
 - `AI课后作业`：教师发布单选、主观、代码混合题，学生提交后由大模型批改并返回分数和反馈。
 
-本仓库提交代码、迁移、静态资源、测试和课程 seed。运行时 SQLite 数据库、管理员账号、学生名单、班级、学生账号、答题记录、本地 `.env` 与 API Key 均留在本机。
+本仓库提交代码、迁移、静态资源、测试和课程 seed。运行时 SQLite 数据库、管理员账号、学生名单、班级、学生账号、答题记录、本地 `.env` 与 API Key 均留在运行环境（本机或服务器）。
 
 ## 目录
 
 - `services/api/`：FastAPI 后端、教师端 HTML 页面、学生 REST API、聊天代理、数据库模型与 Alembic 迁移。
-- `apps/student-desktop/`：学生端 React + Vite + Tauri 应用，含 Pyodide 代码练习界面。
+- `apps/student-desktop/`：学生端 React + Vite Web SPA，含 Pyodide 代码练习界面；`src-tauri/` 保留本机桌面包源码。
 - `services/api/seeds/chapters.json`：基础课堂练习 seed，不包含运行时账号、名单、班级和答题记录。
 - `scripts/initialize_content_db.py`：初始化本地数据库；默认保护已设计的课程内容，清空运行时数据。
 
@@ -19,7 +19,7 @@
 
 ```bash
 cd services/api
-python3 -m venv .venv
+/opt/homebrew/bin/python3.12 -m venv .venv   # Mac；其他平台用系统 python3.12
 . .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
@@ -62,7 +62,7 @@ curl http://127.0.0.1:8000/health
 
 ## 启动学生端
 
-浏览器调试：
+本地浏览器测试（主要开发方式）：
 
 ```bash
 cd apps/student-desktop
@@ -70,16 +70,42 @@ pnpm install
 pnpm dev
 ```
 
-终端会输出本地地址，通常是 `http://localhost:1420`。
+访问 `http://127.0.0.1:1420/`，API 需先启动。学生端通过 Vite 代理将 `/v1` 转发到 `http://127.0.0.1:8000`。
 
-桌面 App：
+生产构建（部署前运行）：
+
+```bash
+cd apps/student-desktop
+pnpm build
+```
+
+输出在 `apps/student-desktop/dist/`，复制或 rsync 到服务器 `student-dist/` 目录，配置细节见 `deploy/README.md`。
+
+Tauri 桌面包（仅本机实验，非生产路径）：
 
 ```bash
 cd apps/student-desktop
 pnpm tauri dev
 ```
 
-学生端开发默认通过 Vite 代理访问 API：`/v1` → `http://127.0.0.1:8000`。API 需要先启动。学生使用教师端名单中的学号与姓名注册，登录后可在三个模块之间切换。
+学生使用教师端名单中的学号与姓名注册，登录后可在三个模块之间切换。
+
+## 生产部署
+
+项目部署在同一域名下：
+
+| 入口 | 地址 |
+|---|---|
+| 学生端 SPA | `https://bujiuhong6.top/student/` |
+| 教师端 | `https://bujiuhong6.top/teacher/login` |
+| API | `https://bujiuhong6.top/v1/...` |
+| 健康检查 | `https://bujiuhong6.top/health` |
+
+部署步骤、Nginx 配置、systemd 单元文件见 `deploy/README.md`。
+
+运行时 SQLite 数据库存放在服务器 `services/api/data/teach.db`，不提交到仓库。本地测试数据保留在本机。
+
+**备份**：定期将服务器上的 `teach.db` 下载到本地安全位置。恢复时停止服务、替换文件、运行 `alembic upgrade head`、再启动服务。
 
 ## 接入大语言模型
 
