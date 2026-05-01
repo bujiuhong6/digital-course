@@ -6,14 +6,14 @@
 - `AI课堂练习`：学生进入章节练习，完成随堂编程任务，页面内提供 AI 助教陪练。
 - `AI课后作业`：教师发布单选、主观、代码混合题，学生提交后由大模型批改并返回分数和反馈。
 
-本仓库提交代码、迁移、静态资源、测试和课程 seed。运行时 SQLite 数据库、管理员账号、学生名单、班级、学生账号、答题记录、本地 `.env` 与 API Key 均留在运行环境（本机或服务器）。
+本仓库提交代码、数据库迁移、静态资源、测试和预置课程内容。运行时 SQLite 数据库、管理员账号、学生名单、班级、学生账号、答题记录、本地 `.env` 与 API Key 均留在运行环境（本机或服务器）。
 
 ## 目录结构
 
 ```text
 digital-course/
 ├── services/api/          # FastAPI 后端、教师端 HTML、学生 API、Alembic 迁移
-├── apps/student-desktop/  # React + Vite 学生端 Web SPA；src-tauri/ 为桌面实验源码
+├── apps/student-desktop/  # React + Vite 学生端 Web SPA；src-tauri/ 为桌面版实验源码
 ├── scripts/               # 数据库内容初始化脚本
 ├── docs/                  # 文档与模板
 ├── deploy/                # Nginx 配置、systemd 单元文件、部署检查清单
@@ -58,13 +58,15 @@ cd digital-course
 
 ### 3. 初始化后端 API
 
+Linux / macOS：
+
 ```bash
 cd services/api
 
 # macOS Homebrew Python
 /opt/homebrew/bin/python3.12 -m venv .venv
 
-# Linux / 其他平台常见写法
+# Linux 常见写法
 # python3.12 -m venv .venv
 
 source .venv/bin/activate
@@ -73,26 +75,70 @@ cp .env.example .env
 python -m alembic upgrade head
 ```
 
-回到仓库根目录，初始化课程内容：
+Windows PowerShell：
+
+```powershell
+cd services/api
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+Copy-Item .env.example .env
+python -m alembic upgrade head
+```
+
+如 PowerShell 阻止启用虚拟环境，可在当前终端执行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+回到仓库根目录，初始化预置课程内容。
+
+Linux / macOS：
 
 ```bash
 cd ../..
 services/api/.venv/bin/python scripts/initialize_content_db.py --prune-extra-chapters
 ```
 
-初始化脚本会补齐 seed 中缺失的课堂练习内容，并保留已经存在的 `AI智能预习`、`AI课堂练习`、`AI课后作业` 内容。它会清空管理员账号、学生名单、班级、学生账号、答题记录和审计记录；教师端首次进入会提示设置管理员账号和密码。
+Windows PowerShell：
 
-如需补齐课程 seed 并保留运行时数据：
+```powershell
+cd ..\..
+.\services\api\.venv\Scripts\python.exe .\scripts\initialize_content_db.py --prune-extra-chapters
+```
+
+初始化脚本会补齐预置课堂练习内容，并保留已经存在的 `AI智能预习`、`AI课堂练习`、`AI课后作业` 内容。它会清空管理员账号、学生名单、班级、学生账号、答题记录和审计记录；教师端首次进入会提示设置管理员账号和密码。
+
+如需补齐预置课程内容并保留运行时数据，使用 `--keep-runtime`。
+
+Linux / macOS：
 
 ```bash
 services/api/.venv/bin/python scripts/initialize_content_db.py --keep-runtime
 ```
 
+Windows PowerShell：
+
+```powershell
+.\services\api\.venv\Scripts\python.exe .\scripts\initialize_content_db.py --keep-runtime
+```
+
 启动 API：
+
+Linux / macOS：
 
 ```bash
 cd services/api
 .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Windows PowerShell：
+
+```powershell
+cd services/api
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 健康检查：
@@ -122,10 +168,21 @@ curl http://127.0.0.1:8000/health
 
 新开一个终端，进入学生端目录：
 
+Linux / macOS：
+
 ```bash
 cd apps/student-desktop
 pnpm install
 cp .env.example .env
+pnpm dev
+```
+
+Windows PowerShell：
+
+```powershell
+cd apps/student-desktop
+pnpm install
+Copy-Item .env.example .env
 pnpm dev
 ```
 
@@ -150,18 +207,18 @@ pnpm preview
 
 `pnpm preview` 只用于本地预览构建结果，生产环境使用 Nginx 提供静态文件。
 
-### 6. Tauri 桌面实验入口
+### 6. 桌面版实验入口
 
 ```bash
 cd apps/student-desktop
 pnpm tauri dev
 ```
 
-当前生产部署走 Web SPA，`src-tauri/` 保留为本机实验源码。
+当前生产部署走 Web SPA，`src-tauri/` 保留为桌面版实验源码。
 
 ## 二、Docker 快速体验（API）
 
-Docker Compose 当前用于快速启动后端 API 和 SQLite 数据卷，适合检查 API 服务是否能运行。完整课程初始化建议使用上一节的本地 venv 流程，或使用后文云服务器部署流程。
+Docker Compose 当前用于快速启动后端 API 和 SQLite 数据卷，适合检查 API 服务是否能运行。完整预置课程内容初始化建议使用上一节的本地 venv 流程，或使用后文云服务器部署流程。
 
 ### 1. 前置要求
 
@@ -280,7 +337,7 @@ mkdir -p data
 python -m alembic upgrade head
 ```
 
-全新部署时，从仓库根目录初始化课程内容：
+全新部署时，从仓库根目录初始化预置课程内容：
 
 ```bash
 cd /www/wwwroot/digital-course
@@ -399,7 +456,7 @@ systemctl reload nginx
 - 健康检查：`https://your-domain.com/health`
 - API：`https://your-domain.com/v1/...`
 
-示例 Nginx 配置当前代理了 `/teacher`、`/v1`、`/health`、`/static`、`/favicon.ico`。如需在生产访问 FastAPI 默认 `/docs` 和 `/openapi.json`，请额外添加对应 `location` 并评估访问控制策略。
+示例 Nginx 配置当前代理了 `/teacher`、`/v1`、`/health`、`/static`、`/favicon.ico`。如需在生产访问在线 API 调试页面（FastAPI 默认 `/docs` 和 `/openapi.json`），请额外添加对应 `location` 并评估访问控制策略。
 
 ## 四、接入大语言模型
 
@@ -566,6 +623,6 @@ ADMIN_COOKIE_SECURE=true
 proxy_set_header X-Forwarded-Proto https;
 ```
 
-### 5. 生产环境需要 Swagger 文档
+### 5. 生产环境需要在线 API 调试页面
 
-当前示例 Nginx 配置代理了教学平台的核心入口。需要生产访问 FastAPI 文档时，在 Nginx 中增加 `/docs` 和 `/openapi.json` 对应 `location`，并设置访问控制策略。
+当前示例 Nginx 配置代理了教学平台的核心入口。需要生产访问在线 API 调试页面时，在 Nginx 中增加 `/docs` 和 `/openapi.json` 对应 `location`，并设置访问控制策略。
