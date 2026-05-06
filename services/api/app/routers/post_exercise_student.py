@@ -14,6 +14,7 @@ from ..db.models import PostExercise, PostExerciseSubmission
 from ..deps import CurrentStudent, DBSession
 from ..services.llm_config import get_effective_llm_config
 from ..services.post_exercise_grader import grade_post_exercise
+from ..services.student_drill import is_admin_drill_student
 
 
 router = APIRouter(prefix="/v1/student/post-exercises", tags=["student", "post-exercises"])
@@ -114,12 +115,14 @@ async def list_post_exercises(me: CurrentStudent, db: DBSession) -> dict:
             .order_by(PostExercise.order, PostExercise.title)
         )
     ).scalars().all()
-    submitted = (
-        await db.execute(
-            select(PostExerciseSubmission.exercise_id).where(PostExerciseSubmission.student_id == me.id)
-        )
-    ).scalars().all()
-    submitted_ids = set(submitted)
+    submitted_ids = set()
+    if not is_admin_drill_student(me):
+        submitted = (
+            await db.execute(
+                select(PostExerciseSubmission.exercise_id).where(PostExerciseSubmission.student_id == me.id)
+            )
+        ).scalars().all()
+        submitted_ids = set(submitted)
     return {
         "ok": True,
         "exercises": [
@@ -138,14 +141,16 @@ async def list_post_exercises(me: CurrentStudent, db: DBSession) -> dict:
 @router.get("/{exercise_id}")
 async def get_post_exercise(me: CurrentStudent, db: DBSession, exercise_id: uuid.UUID) -> dict:
     ex = await _get_published_or_404(db, exercise_id)
-    sub = (
-        await db.execute(
-            select(PostExerciseSubmission).where(
-                PostExerciseSubmission.exercise_id == ex.id,
-                PostExerciseSubmission.student_id == me.id,
+    sub = None
+    if not is_admin_drill_student(me):
+        sub = (
+            await db.execute(
+                select(PostExerciseSubmission).where(
+                    PostExerciseSubmission.exercise_id == ex.id,
+                    PostExerciseSubmission.student_id == me.id,
+                )
             )
-        )
-    ).scalar_one_or_none()
+        ).scalar_one_or_none()
     return {
         "ok": True,
         "exercise": {
@@ -176,6 +181,13 @@ async def submit_post_exercise(
         for a in body.answers
     ]
     _validate_answers(ex.published_content, answers)
+    if is_admin_drill_student(me):
+        return {
+            "ok": True,
+            "score": 0,
+            "feedback": "管理员演练模式：本次作答已校验，系统未保存提交记录。",
+            "drill": True,
+        }
     score, feedback, raw = await grade_post_exercise(db, content=ex.published_content, answers=answers)
     existing = (
         await db.execute(
@@ -203,6 +215,30 @@ async def submit_post_exercise(
         existing.submitted_at = datetime.now(timezone.utc)
     await db.flush()
     return {"ok": True, "score": score, "feedback": feedback}
+
+
+@router.post("/{exercise_id}/unsubmit")
+async def unsubmit_post_exercise(
+    me: CurrentStudent,
+    db: DBSession,
+    exercise_id: uuid.UUID,
+) -> dict:
+    ex = await _get_published_or_404(db, exercise_id)
+    if is_admin_drill_student(me):
+        return {"ok": True, "withdrawn": True, "drill": True}
+    existing = (
+        await db.execute(
+            select(PostExerciseSubmission).where(
+                PostExerciseSubmission.student_id == me.id,
+                PostExerciseSubmission.exercise_id == ex.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        return {"ok": False, "withdrawn": False, "detail": "not_submitted"}
+    await db.delete(existing)
+    await db.flush()
+    return {"ok": True, "withdrawn": True}
 
 
 @router.post("/{exercise_id}/chat")

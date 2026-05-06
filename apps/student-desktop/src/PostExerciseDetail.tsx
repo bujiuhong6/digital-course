@@ -54,6 +54,7 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
   const [activeQuestionId, setActiveQuestionId] = useState<string>("post-exercise");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saveHint, setSaveHint] = useState<string | null>(null);
   const [result, setResult] = useState<{ score: number; feedback?: string | null } | null>(null);
@@ -128,7 +129,7 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
   }
 
   async function submit() {
-    if (!canSubmit || submitting || readonly) return;
+    if (!canSubmit || submitting || withdrawing || readonly) return;
     setSubmitting(true);
     setErr(null);
     try {
@@ -138,6 +139,20 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
       );
       if (studentId) clearPostExerciseDraft(studentId, exerciseId);
       setResult({ score: res.score, feedback: res.feedback });
+      setExercise((prev) =>
+        prev
+          ? {
+              ...prev,
+              submitted: true,
+              submission: {
+                score: res.score,
+                feedback: res.feedback ?? null,
+                submittedAt: new Date().toISOString(),
+                answers: answerPayload(),
+              },
+            }
+          : prev,
+      );
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -145,8 +160,39 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
     }
   }
 
+  async function unsubmit() {
+    if (!readonly || withdrawing || submitting) return;
+    setWithdrawing(true);
+    setErr(null);
+    try {
+      const res = await apiJson<{ ok: boolean; withdrawn: boolean; detail?: string }>(
+        `/v1/student/post-exercises/${exerciseId}/unsubmit`,
+        { method: "POST" },
+      );
+      if (!res.withdrawn && res.detail !== "not_submitted") {
+        throw new Error(res.detail || "取消提交失败。");
+      }
+      setResult(null);
+      setExercise((prev) =>
+        prev
+          ? {
+              ...prev,
+              submitted: false,
+              submission: null,
+            }
+          : prev,
+      );
+      if (studentId) savePostExerciseDraft(studentId, exerciseId, { ...answers });
+      setSaveHint("已取消提交，可继续修改后重新提交。");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
   function saveDraft() {
-    if (!studentId || readonly || submitting) return;
+    if (!studentId || readonly || submitting || withdrawing) return;
     try {
       savePostExerciseDraft(studentId, exerciseId, { ...answers });
       setSaveHint("已保存。下次打开本题可继续作答。");
@@ -158,9 +204,6 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
   return (
     <section className="sd-chapter-wrap">
       <div className="sd-chapter-topbar">
-        <Button type="button" variant="outline" onClick={onBack}>
-          返回课后作业
-        </Button>
         <span>代码题只提交文本，由 AI 根据标准答案和规则批改。</span>
       </div>
       {loading ? (
@@ -214,19 +257,32 @@ export function PostExerciseDetail({ exerciseId, studentId, onBack }: Props) {
             )}
             <div className="sd-form-actions-wrap">
               <div className="sd-form-actions">
+                <Button type="button" variant="outline" disabled={submitting || withdrawing} onClick={onBack}>
+                  返回课后作业
+                </Button>
                 {!readonly ? (
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!studentId || submitting}
+                    disabled={!studentId || submitting || withdrawing}
                     onClick={saveDraft}
                   >
                     保存
                   </Button>
                 ) : null}
+                {readonly ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={withdrawing || submitting}
+                    onClick={() => void unsubmit()}
+                  >
+                    {withdrawing ? "取消中…" : "取消提交"}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
-                  disabled={!canSubmit || submitting || readonly}
+                  disabled={!canSubmit || submitting || withdrawing || readonly}
                   onClick={() => void submit()}
                 >
                   {submitting ? "批改中…" : readonly ? "已提交" : "提交并批改"}

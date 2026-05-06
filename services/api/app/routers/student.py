@@ -25,6 +25,7 @@ from ..services.cell_eval import (
 )
 from ..services.crypto import decrypt_password, encrypt_password
 from ..services.student_jwt import create_student_token
+from ..services.student_drill import is_admin_drill_student
 
 try:
     from passlib.context import CryptContext
@@ -246,24 +247,27 @@ async def list_published_chapters(me: CurrentStudent, db: DBSession) -> dict:
 
     chapter_ids = [c.id for c in rows]
 
-    cr = await db.execute(
-        select(ChapterCompletion.chapter_id).where(
-            ChapterCompletion.student_id == me.id,
-            ChapterCompletion.chapter_id.in_(chapter_ids),
+    completed_ids: set[uuid.UUID] = set()
+    has_pass_ids: set[uuid.UUID] = set()
+    if not is_admin_drill_student(me):
+        cr = await db.execute(
+            select(ChapterCompletion.chapter_id).where(
+                ChapterCompletion.student_id == me.id,
+                ChapterCompletion.chapter_id.in_(chapter_ids),
+            )
         )
-    )
-    completed_ids = {row[0] for row in cr.all()}
+        completed_ids = {row[0] for row in cr.all()}
 
-    pr = await db.execute(
-        select(CellVerification.chapter_id)
-        .where(
-            CellVerification.student_id == me.id,
-            CellVerification.chapter_id.in_(chapter_ids),
-            CellVerification.run_ok.is_(True),
+        pr = await db.execute(
+            select(CellVerification.chapter_id)
+            .where(
+                CellVerification.student_id == me.id,
+                CellVerification.chapter_id.in_(chapter_ids),
+                CellVerification.run_ok.is_(True),
+            )
+            .distinct()
         )
-        .distinct()
-    )
-    has_pass_ids = {row[0] for row in pr.all()}
+        has_pass_ids = {row[0] for row in pr.all()}
 
     def _practice_status(cid: uuid.UUID) -> str:
         if cid in completed_ids:
@@ -298,23 +302,28 @@ async def get_published_chapter(
     ch = r.scalar_one_or_none()
     if ch is None:
         raise HTTPException(status_code=404, detail="chapter not found or not published")
-    cr = await db.execute(
-        select(ChapterCompletion).where(
-            ChapterCompletion.student_id == me.id,
-            ChapterCompletion.chapter_id == chapter_id,
+    has_completed = False
+    if not is_admin_drill_student(me):
+        cr = await db.execute(
+            select(ChapterCompletion).where(
+                ChapterCompletion.student_id == me.id,
+                ChapterCompletion.chapter_id == chapter_id,
+            )
         )
-    )
-    has_completed = cr.scalar_one_or_none() is not None
+        has_completed = cr.scalar_one_or_none() is not None
     d = _public_chapter_dict(ch)
     d["hasCompletedChapter"] = has_completed
-    vrows = await db.execute(
-        select(CellVerification.cell_id).where(
-            CellVerification.student_id == me.id,
-            CellVerification.chapter_id == chapter_id,
-            CellVerification.run_ok.is_(True),
+    if is_admin_drill_student(me):
+        d["cellsPassed"] = []
+    else:
+        vrows = await db.execute(
+            select(CellVerification.cell_id).where(
+                CellVerification.student_id == me.id,
+                CellVerification.chapter_id == chapter_id,
+                CellVerification.run_ok.is_(True),
+            )
         )
-    )
-    d["cellsPassed"] = [row[0] for row in vrows.all()]
+        d["cellsPassed"] = [row[0] for row in vrows.all()]
     return {"ok": True, "chapter": d}
 
 
@@ -357,6 +366,13 @@ async def verify_cell(
         stdout=out,
         stderr=err_s,
     )
+    if is_admin_drill_student(me):
+        return {
+            "ok": True,
+            "passed": passed,
+            "runOk": passed,
+            "drill": True,
+        }
     ex = (body.error_excerpt or "")[:500] if body.error_excerpt else None
     now = datetime.now(timezone.utc)
     existing = await db.execute(
@@ -410,6 +426,8 @@ async def complete_chapter(
     pc = ch.published_content
     if not isinstance(pc, dict):
         raise HTTPException(status_code=400, detail="invalid published content")
+    if is_admin_drill_student(me):
+        return {"ok": True, "alreadyCompleted": False, "drill": True}
     need = required_cell_ids_from_content(pc)
     if not need:
         raise HTTPException(status_code=400, detail="no cells in chapter")
@@ -461,6 +479,8 @@ async def uncomplete_chapter(
     )
     if r.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="chapter not found or not published")
+    if is_admin_drill_student(me):
+        return {"ok": True, "withdrawn": True, "drill": True}
     ex = await db.execute(
         select(ChapterCompletion).where(
             ChapterCompletion.student_id == me.id,

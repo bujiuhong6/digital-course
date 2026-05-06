@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+import random
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -345,6 +346,25 @@ async def post_prestudy_delete(_t: CurrentTeacher, db: DBSession, prestudy_id: u
     return RedirectResponse(url="/teacher/prestudy?flash=deleted", status_code=303)
 
 
+def _cap_anonymous_feedback_rows(
+    rows: list[dict],
+    prestudy_id: uuid.UUID,
+) -> list[dict]:
+    """Show at most 5 anonymous lines; when several exist pick 2-5 deterministically per chapter."""
+    if not rows:
+        return []
+    seed = int(str(prestudy_id).replace("-", ""), 16) % (2**31)
+    if len(rows) <= 5:
+        return rows
+    cap = min(len(rows), max(2, 2 + (seed % 4)))
+    order = list(range(len(rows)))
+    rng = random.Random(seed)
+    rng.shuffle(order)
+    picked = [rows[i] for i in order[:cap]]
+    picked.sort(key=lambda r: r["response"].submitted_at, reverse=True)
+    return picked
+
+
 def _feedback_view_data(
     ch: PrestudyChapter,
     responses: list[tuple[PrestudyResponse, Student]],
@@ -359,7 +379,13 @@ def _feedback_view_data(
             item_id = str(rating.get("itemId") or "")
             if item_ids and item_id not in item_ids:
                 continue
-            score = int(rating.get("score", 0))
+            raw = rating.get("score")
+            if raw is None:
+                raw = rating.get("rating")
+            try:
+                score = int(raw)
+            except (TypeError, ValueError):
+                score = 0
             if 1 <= score <= 7:
                 aggregate_dist[score] += 1
                 all_scores.append(score)
@@ -429,6 +455,7 @@ def _feedback_view_data(
         for resp, st in responses
         if (resp.feedback_text or "").strip()
     ]
+    feedback_rows = _cap_anonymous_feedback_rows(feedback_rows, ch.id)
     return {
         "rating_summary": {
             "total": total_ratings,

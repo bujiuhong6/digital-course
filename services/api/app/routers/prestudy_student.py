@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from ..db.models import PrestudyChapter, PrestudyResponse
 from ..deps import CurrentStudent, DBSession
+from ..services.student_drill import is_admin_drill_student
 
 
 router = APIRouter(prefix="/v1/student/prestudy", tags=["student", "prestudy"])
@@ -55,10 +56,12 @@ async def list_prestudy(me: CurrentStudent, db: DBSession) -> dict:
             .order_by(PrestudyChapter.order, PrestudyChapter.title)
         )
     ).scalars().all()
-    submitted = (
-        await db.execute(select(PrestudyResponse.prestudy_id).where(PrestudyResponse.student_id == me.id))
-    ).scalars().all()
-    submitted_ids = set(submitted)
+    submitted_ids: set[uuid.UUID] = set()
+    if not is_admin_drill_student(me):
+        submitted = (
+            await db.execute(select(PrestudyResponse.prestudy_id).where(PrestudyResponse.student_id == me.id))
+        ).scalars().all()
+        submitted_ids = set(submitted)
     return {"ok": True, "prestudies": [_prestudy_to_list_item(x, submitted_ids) for x in rows]}
 
 
@@ -74,14 +77,16 @@ async def get_prestudy(me: CurrentStudent, db: DBSession, prestudy_id: uuid.UUID
     ).scalar_one_or_none()
     if ch is None or ch.published_content is None:
         raise HTTPException(status_code=404, detail="prestudy_not_found")
-    resp = (
-        await db.execute(
-            select(PrestudyResponse).where(
-                PrestudyResponse.prestudy_id == ch.id,
-                PrestudyResponse.student_id == me.id,
+    resp = None
+    if not is_admin_drill_student(me):
+        resp = (
+            await db.execute(
+                select(PrestudyResponse).where(
+                    PrestudyResponse.prestudy_id == ch.id,
+                    PrestudyResponse.student_id == me.id,
+                )
             )
-        )
-    ).scalar_one_or_none()
+        ).scalar_one_or_none()
     return {
         "ok": True,
         "prestudy": {
@@ -121,6 +126,8 @@ async def submit_prestudy_response(
     received = {x.item_id for x in body.ratings}
     if received != expected or len(received) != len(body.ratings):
         raise HTTPException(status_code=400, detail="ratings_must_match_items")
+    if is_admin_drill_student(me):
+        return {"ok": True, "submitted": False, "drill": True}
     existing = (
         await db.execute(
             select(PrestudyResponse).where(

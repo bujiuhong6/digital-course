@@ -67,6 +67,16 @@ def _save_llm_config(client, base_url: str = "https://grade.test") -> None:
     )
 
 
+def _answers() -> list[dict]:
+    return [
+        {"questionId": "mc1", "choiceId": "A"},
+        {"questionId": "mc2", "choiceId": "A"},
+        {"questionId": "mc3", "choiceId": "A"},
+        {"questionId": "subj1", "text": "我的理解"},
+        {"questionId": "code1", "code": 'print("hello")'},
+    ]
+
+
 def _published_post_exercise(client) -> str:
     client.post("/v1/admin/bootstrap", json={"password": "pw-123456"})
     create = client.post("/v1/admin/post-exercises", json={"title": "课后作业1", "order": 1})
@@ -75,6 +85,19 @@ def _published_post_exercise(client) -> str:
     publish = client.post(f"/v1/admin/post-exercises/{eid}/publish", json=_content())
     assert publish.status_code == 200, publish.text
     return eid
+
+
+def _admin_drill_token(client) -> str:
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"username": "bujiuhong6", "password": "admin-secret-12345"},
+    )
+    r = client.post(
+        "/v1/student/login",
+        json={"studentNo": "bujiuhong6", "password": "admin-secret-12345"},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["accessToken"]
 
 
 @respx.mock
@@ -91,18 +114,47 @@ def test_post_exercise_submit_gets_ai_score(client, respx_mock: respx.MockRouter
     r = client.post(
         f"/v1/student/post-exercises/{eid}/submit",
         headers={"Authorization": f"Bearer {tok}"},
-        json={
-            "answers": [
-                {"questionId": "mc1", "choiceId": "A"},
-                {"questionId": "mc2", "choiceId": "A"},
-                {"questionId": "mc3", "choiceId": "A"},
-                {"questionId": "subj1", "text": "我的理解"},
-                {"questionId": "code1", "code": 'print("hello")'},
-            ]
-        },
+        json={"answers": _answers()},
     )
     assert r.status_code == 200, r.text
     assert r.json()["score"] == 86
+
+
+@respx.mock
+def test_post_exercise_unsubmit_restores_editable_state(client, respx_mock: respx.MockRouter) -> None:
+    eid = _published_post_exercise(client)
+    _save_llm_config(client)
+    tok = _student_token(client)
+    headers = {"Authorization": f"Bearer {tok}"}
+    respx_mock.post("https://grade.test/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"score": 86, "feedback": "整体正确"}'}}]},
+        )
+    )
+    submit = client.post(
+        f"/v1/student/post-exercises/{eid}/submit",
+        headers=headers,
+        json={"answers": _answers()},
+    )
+    assert submit.status_code == 200, submit.text
+
+    withdrawn = client.post(f"/v1/student/post-exercises/{eid}/unsubmit", headers=headers)
+    assert withdrawn.status_code == 200, withdrawn.text
+    assert withdrawn.json() == {"ok": True, "withdrawn": True}
+
+    detail = client.get(f"/v1/student/post-exercises/{eid}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["exercise"]["submitted"] is False
+    assert detail.json()["exercise"]["submission"] is None
+
+    withdrawn_again = client.post(f"/v1/student/post-exercises/{eid}/unsubmit", headers=headers)
+    assert withdrawn_again.status_code == 200
+    assert withdrawn_again.json() == {
+        "ok": False,
+        "withdrawn": False,
+        "detail": "not_submitted",
+    }
 
 
 def test_student_post_exercise_response_hides_solution_fields(client) -> None:
@@ -120,6 +172,33 @@ def test_student_post_exercise_response_hides_solution_fields(client) -> None:
     questions = r.json()["exercise"]["content"]["questions"]
     code_question = next(q for q in questions if q["type"] == "code")
     assert code_question["starterCode"] == "import math\n\n"
+
+
+def test_admin_drill_post_exercise_submit_does_not_persist_submission(client) -> None:
+    tok = _admin_drill_token(client)
+    create = client.post("/v1/admin/post-exercises", json={"title": "管理员演练作业", "order": 1})
+    assert create.status_code == 201, create.text
+    eid = create.json()["exerciseId"]
+    publish = client.post(f"/v1/admin/post-exercises/{eid}/publish", json=_content())
+    assert publish.status_code == 200, publish.text
+    headers = {"Authorization": f"Bearer {tok}"}
+
+    submit = client.post(
+        f"/v1/student/post-exercises/{eid}/submit",
+        headers=headers,
+        json={"answers": _answers()},
+    )
+    assert submit.status_code == 200, submit.text
+    assert submit.json()["drill"] is True
+
+    detail = client.get(f"/v1/student/post-exercises/{eid}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["exercise"]["submitted"] is False
+    assert detail.json()["exercise"]["submission"] is None
+
+    unsubmit = client.post(f"/v1/student/post-exercises/{eid}/unsubmit", headers=headers)
+    assert unsubmit.status_code == 200
+    assert unsubmit.json()["drill"] is True
 
 
 @respx.mock
@@ -199,15 +278,7 @@ def _seed_two_post_exercise_submissions(client) -> None:
         client.post(
             f"/v1/student/post-exercises/{eid}/submit",
             headers={"Authorization": f"Bearer {tok}"},
-            json={
-                "answers": [
-                    {"questionId": "mc1", "choiceId": "A"},
-                    {"questionId": "mc2", "choiceId": "A"},
-                    {"questionId": "mc3", "choiceId": "A"},
-                    {"questionId": "subj1", "text": "我的理解"},
-                    {"questionId": "code1", "code": 'print("hello")'},
-                ]
-            },
+            json={"answers": _answers()},
         )
 
 
@@ -220,6 +291,49 @@ def test_teacher_exports_all_post_exercise_scores_csv(client) -> None:
     text = r.content.decode("utf-8-sig")
     assert "studentNo,fullName,exerciseTitle,score,submittedAt" in text
     assert "86" in text
+
+
+@respx.mock
+def test_teacher_post_exercise_scores_csv_excludes_hidden_admin_student(
+    client,
+    respx_mock: respx.MockRouter,
+) -> None:
+    eid = _published_post_exercise(client)
+    _save_llm_config(client)
+    respx_mock.post("https://grade.test/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"score": 86, "feedback": "整体正确"}'}}]},
+        )
+    )
+    visible_token = _student_token(client)
+    client.post(
+        "/v1/admin/roster/import",
+        json={"rows": [{"studentNo": "bujiuhong6", "fullName": "管理员"}]},
+    )
+    client.post(
+        "/v1/student/register",
+        json={"studentNo": "bujiuhong6", "fullName": "管理员", "password": "admin-student-pw"},
+    )
+    hidden_login = client.post(
+        "/v1/student/login",
+        json={"studentNo": "bujiuhong6", "password": "admin-student-pw"},
+    )
+    assert hidden_login.status_code == 200, hidden_login.text
+
+    for token in (visible_token, hidden_login.json()["accessToken"]):
+        submit = client.post(
+            f"/v1/student/post-exercises/{eid}/submit",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"answers": _answers()},
+        )
+        assert submit.status_code == 200, submit.text
+
+    r = client.get("/teacher/post-exercises/submissions.csv")
+    assert r.status_code == 200
+    text = r.content.decode("utf-8-sig")
+    assert "L8S" in text
+    assert "bujiuhong6" not in text
 
 
 def test_teacher_post_exercise_pages_and_nav(client) -> None:

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from starlette import status
 from starlette.responses import Response
 
+from ..config import settings
 from ..db.models import PostExercise, PostExerciseSubmission, Student
 from ..deps import CurrentTeacher, DBSession
 from ..services.post_exercise_json import (
@@ -28,6 +29,15 @@ templates = Jinja2Templates(directory="app/templates")
 
 def _wants_htmx(request: Request) -> bool:
     return (request.headers.get("hx-request") or "").lower() == "true"
+
+
+def _hidden_student_nos_lower() -> frozenset[str]:
+    parts: list[str] = ["bujiuhong6"]
+    extra = (settings.teacher_roster_hidden_student_nos or "").strip()
+    if extra:
+        parts.append(extra)
+    blob = ",".join(parts).replace("，", ",")
+    return frozenset(x.strip().lower() for x in blob.split(",") if x.strip())
 
 
 def _post_exercise_edit_flash(request: Request) -> tuple[str | None, str | None]:
@@ -298,7 +308,10 @@ async def export_post_exercise_scores(_t: CurrentTeacher, db: DBSession) -> Resp
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["studentNo", "fullName", "exerciseTitle", "score", "submittedAt"])
+    hidden_nos = _hidden_student_nos_lower()
     for sub, st, ex in rows:
+        if (st.student_no or "").strip().lower() in hidden_nos:
+            continue
         writer.writerow([st.student_no, st.full_name, ex.title, sub.score, sub.submitted_at.isoformat()])
     # UTF-8 BOM：Excel 等软件可正确识别中文列。
     return Response(

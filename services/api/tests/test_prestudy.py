@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import httpx
 import respx
+from uuid import uuid4
 
 from test_task8_student_chapters import _student_token
 
@@ -32,6 +33,19 @@ def _create_published_prestudy(client) -> str:
     return pid
 
 
+def _admin_drill_token(client) -> str:
+    client.post(
+        "/v1/admin/bootstrap",
+        json={"username": "bujiuhong6", "password": "admin-secret-12345"},
+    )
+    r = client.post(
+        "/v1/student/login",
+        json={"studentNo": "bujiuhong6", "password": "admin-secret-12345"},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["accessToken"]
+
+
 def _published_prestudy_with_response(client) -> str:
     pid = _create_published_prestudy(client)
     tok = _student_token(client)
@@ -45,6 +59,33 @@ def _published_prestudy_with_response(client) -> str:
     )
     assert submit.status_code == 200, submit.text
     return pid
+
+
+def test_feedback_view_data_accepts_legacy_rating_field() -> None:
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from app.routers.prestudy_admin import _feedback_view_data
+
+    pid = uuid4()
+    ch = SimpleNamespace(
+        id=pid,
+        title="演示",
+        published_content={
+            "items": [
+                {"id": "k1", "title": "知识点1", "learningGoal": "目标"},
+            ]
+        },
+    )
+    resp = SimpleNamespace(
+        ratings=[{"itemId": "k1", "rating": 6}],
+        feedback_text="匿",
+        submitted_at=datetime.now(timezone.utc),
+    )
+    st = SimpleNamespace()
+    out = _feedback_view_data(ch, [(resp, st)])
+    assert out["rating_summary"]["total"] == 1
+    assert out["rating_summary"]["average"] == 6.0
 
 
 def test_student_lists_published_prestudy_and_submits_feedback(client) -> None:
@@ -83,6 +124,41 @@ def test_student_prestudy_ratings_must_match_items(client) -> None:
         json={"ratings": [{"itemId": "k1", "score": 6}], "feedbackText": ""},
     )
     assert bad.status_code == 400
+
+
+def test_admin_drill_prestudy_submit_does_not_persist_response(client) -> None:
+    tok = _admin_drill_token(client)
+    create = client.post("/v1/admin/prestudy", json={"title": "管理员演练预习", "order": 1})
+    assert create.status_code == 201, create.text
+    pid = create.json()["prestudyId"]
+    publish = client.post(
+        f"/v1/admin/prestudy/{pid}/publish",
+        json={
+            "items": [
+                {"id": "k1", "title": "概念", "learningGoal": "能说明概念"},
+                {"id": "k2", "title": "应用", "learningGoal": "能举例应用"},
+            ]
+        },
+    )
+    assert publish.status_code == 200, publish.text
+    h = {"Authorization": f"Bearer {tok}"}
+
+    submit = client.post(
+        f"/v1/student/prestudy/{pid}/responses",
+        headers=h,
+        json={
+            "ratings": [{"itemId": "k1", "score": 3}, {"itemId": "k2", "score": 4}],
+            "feedbackText": "管理员演练",
+        },
+    )
+    assert submit.status_code == 200, submit.text
+    assert submit.json()["drill"] is True
+    assert submit.json()["submitted"] is False
+
+    detail = client.get(f"/v1/student/prestudy/{pid}", headers=h)
+    assert detail.status_code == 200
+    assert detail.json()["prestudy"]["submitted"] is False
+    assert detail.json()["prestudy"]["response"] is None
 
 
 def test_teacher_prestudy_feedback_page_shows_distribution(client) -> None:

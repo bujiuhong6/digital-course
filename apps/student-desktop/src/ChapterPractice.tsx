@@ -599,10 +599,15 @@ function ChapterPracticeInner({
     () => new Set(initialCellsPassed),
     [initialCellsPassed],
   );
+  const [ignoreInitialPassed, setIgnoreInitialPassed] = useState(false);
+  const effectiveInitialPassedSet = useMemo(
+    () => (ignoreInitialPassed ? new Set<string>() : initialPassedSet),
+    [ignoreInitialPassed, initialPassedSet],
+  );
   const initialPassedSetRef = useRef(initialPassedSet);
   useEffect(() => {
-    initialPassedSetRef.current = new Set(initialCellsPassed);
-  }, [initialCellsPassed]);
+    initialPassedSetRef.current = ignoreInitialPassed ? new Set() : new Set(initialCellsPassed);
+  }, [ignoreInitialPassed, initialCellsPassed]);
   const [saveHint, setSaveHint] = useState<string | null>(null);
   /** 本章是否已不能再次提交（服务端已有记录，或本页已成功提交过） */
   const [chapterSubmitDone, setChapterSubmitDone] = useState(() => {
@@ -649,6 +654,7 @@ function ChapterPracticeInner({
     const prev = lastChapterIdForSyncRef.current;
     const chapterSwitched = prev != null && prev !== chapterId;
     if (chapterSwitched) {
+      setIgnoreInitialPassed(false);
       lastChapterIdForSyncRef.current = chapterId;
       const done =
         initialChapterCompleted || readSessionSubmitDone(studentId, chapterId);
@@ -739,9 +745,9 @@ function ChapterPracticeInner({
       if (s) {
         return s.passed === true;
       }
-      return initialPassedSet.has(id);
+      return effectiveInitialPassedSet.has(id);
     });
-  }, [requiredCellIds, cellState, initialPassedSet]);
+  }, [requiredCellIds, cellState, effectiveInitialPassedSet]);
 
   const pendingExerciseLabels = useCallback((): string[] => {
     const labels: string[] = [];
@@ -761,14 +767,14 @@ function ChapterPracticeInner({
       ];
       for (const cell of cells) {
         const s = cellState[cell.id];
-        const passed = s ? s.passed === true : initialPassedSet.has(cell.id);
+        const passed = s ? s.passed === true : effectiveInitialPassedSet.has(cell.id);
         if (!passed) {
           labels.push(cell.label);
         }
       }
     });
     return labels;
-  }, [data.blocks, cellState, initialPassedSet]);
+  }, [data.blocks, cellState, effectiveInitialPassedSet]);
 
   const resetCellToStarter = useCallback(
     async (kind: CellKind, cell: GuideCell | ExtensionCell) => {
@@ -776,7 +782,7 @@ function ChapterPracticeInner({
       const submitted =
         chapterSubmitDone || readSessionSubmitDone(studentId, chapterId);
       const cellAlreadyPassed =
-        cellState[id]?.passed === true || initialPassedSet.has(id);
+        cellState[id]?.passed === true || effectiveInitialPassedSet.has(id);
       if (submitted) {
         if (!chapterSubmitDone) {
           setChapterSubmitDone(true);
@@ -875,6 +881,7 @@ function ChapterPracticeInner({
       cellState,
       data.blocks,
       initialPassedSet,
+      effectiveInitialPassedSet,
       studentId,
       chapterId,
     ],
@@ -1144,18 +1151,21 @@ function ChapterPracticeInner({
       }>(`/v1/student/chapters/${chapterId}/uncomplete`, { method: "POST" });
       if (r.ok === true && r.withdrawn === true) {
         setChapterSubmitDone(false);
+        setIgnoreInitialPassed(true);
+        initialPassedSetRef.current = new Set();
         clearSessionSubmitDone(studentId, chapterId);
         setCompleteSuccessText(null);
         setCellState((s) => {
           const next = { ...s };
-          for (const k of Object.keys(next)) {
+          for (const k of requiredCellIds) {
             const v = next[k];
-            if (v?.feedbackKind === "chapter_submitted") {
-              next[k] = {
-                ...v,
-                feedbackKind: "idle",
-              };
-            }
+            next[k] = {
+              passed: null,
+              loading: false,
+              lastMsg: null,
+              lastRun: v?.lastRun ?? null,
+              feedbackKind: "idle",
+            };
           }
           return next;
         });
